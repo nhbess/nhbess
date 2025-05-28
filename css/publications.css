@@ -175,6 +175,18 @@
     text-decoration: underline;
 }
 
+.publications-footnote {
+    font-size: 0.95em;
+    color: #aaa;
+    margin-top: 1.5rem;
+    text-align: left;
+}
+
+.publications-footnote a {
+    color: var(--accent-color);
+    text-decoration: underline;
+}
+
 @media (max-width: 768px) {
     .publications-container {
         padding: 1rem;

@@ -4,7 +4,6 @@ const profileImages = [
     '3.png',
     '4.png',
     '5.png',
-    'ChatGPT Image May 25, 2025, 05_12_57 PM.png',
     'ChatGPT Image May 25, 2025, 05_13_36 PM.png',
     'thumbnail.jpg'
 ];

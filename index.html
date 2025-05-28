@@ -1,65 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Personal Website</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
+    <link rel="stylesheet" href="css/style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+  </head>
+  <body>
     <header class="site-header">
-        <div class="profile-circle-container">
-            <div class="profile-images-container">
-                <img src="assets/images_profile/1.png" alt="Profile Image 1" class="profile-image active" data-image="1.png">
-                <img src="assets/images_profile/2.png" alt="Profile Image 2" class="profile-image" data-image="2.png">
-                <img src="assets/images_profile/3.png" alt="Profile Image 3" class="profile-image" data-image="3.png">
-                <img src="assets/images_profile/4.png" alt="Profile Image 4" class="profile-image" data-image="4.png">
-                <img src="assets/images_profile/5.png" alt="Profile Image 5" class="profile-image" data-image="5.png">
-                <img src="assets/images_profile/ChatGPT Image May 25, 2025, 05_12_57 PM.png" alt="Profile Image 6" class="profile-image" data-image="ChatGPT Image May 25, 2025, 05_12_57 PM.png">
-                <img src="assets/images_profile/ChatGPT Image May 25, 2025, 05_13_36 PM.png" alt="Profile Image 7" class="profile-image" data-image="ChatGPT Image May 25, 2025, 05_13_36 PM.png">
-                <img src="assets/images_profile/thumbnail.jpg" alt="Profile Image 8" class="profile-image" data-image="thumbnail.jpg">
-            </div>
-            <div class="circle-points" id="circlePoints"></div>
+      <div class="profile-circle-container">
+        <div class="profile-images-container">
+          <img
+            src="assets/images_profile/1.png"
+            alt="Profile Image 1"
+            class="profile-image active"
+            data-image="1.png"
+          />
+          <img
+            src="assets/images_profile/2.png"
+            alt="Profile Image 2"
+            class="profile-image"
+            data-image="2.png"
+          />
+          <img
+            src="assets/images_profile/3.png"
+            alt="Profile Image 3"
+            class="profile-image"
+            data-image="3.png"
+          />
+          <img
+            src="assets/images_profile/4.png"
+            alt="Profile Image 4"
+            class="profile-image"
+            data-image="4.png"
+          />
+          <img
+            src="assets/images_profile/5.png"
+            alt="Profile Image 5"
+            class="profile-image"
+            data-image="5.png"
+          />
+          <img
+            src="assets/images_profile/ChatGPT Image May 25, 2025, 05_13_36 PM.png"
+            alt="Profile Image 7"
+            class="profile-image"
+            data-image="ChatGPT Image May 25, 2025, 05_13_36 PM.png"
+          />
+          <img
+            src="assets/images_profile/thumbnail.jpg"
+            alt="Profile Image 8"
+            class="profile-image"
+            data-image="thumbnail.jpg"
+          />
         </div>
-        <nav class="main-nav">
-            <ul class="nav-links">
-                <li><a href="#about" class="nav-link">About</a></li>
-                <li><a href="#projects" class="nav-link">Projects</a></li>
-                <li><a href="#publications" class="nav-link">Publications</a></li>
-                <li><a href="#contact" class="nav-link">Contact</a></li>
-            </ul>
-        </nav>
+        <div class="circle-points" id="circlePoints"></div>
+      </div>
+      <nav class="main-nav">
+        <ul class="nav-links">
+          <li><a href="#about" class="nav-link">About</a></li>
+          <li><a href="#projects" class="nav-link">Projects</a></li>
+          <li><a href="#publications" class="nav-link">Publications</a></li>
+          <li><a href="#contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
     </header>
 
     <main class="main-content">
-        <section id="about" class="content-section">
-            <h2 class="section-title">About Me</h2>
-            <p class="section-text">Welcome to my personal website. I'm a passionate individual focused on creating meaningful experiences.</p>
-        </section>
+      <section id="about" class="content-section">
+        <h2 class="section-title">About Me</h2>
+        <p class="section-text">
+          PhD
+          <a href="https://real.itu.dk/" target="_blank"
+            >@Robotics, Evolution and Artificial Life (REAL)</a
+          >
+          at ITU Copenhagen, Denmark.
+          <br />
+          Keywords: Artificial Intelligence, Bio-inspired Computation, Collective Behavior, Decentralized System, Swarm Intelligence.
+        </p>
+      </section>
 
-        <section id="projects" class="content-section">
-            <h2 class="section-title">Projects</h2>
-            <div class="project-cards">
-                <!-- Project cards will go here -->
-            </div>
-        </section>
+      <section id="projects" class="content-section">
+        <h2 class="section-title">Projects</h2>
+        <div class="project-cards">
+          <p class="section-text">Coming soon... Maybe.</p>
+        </div>
+      </section>
 
-        <section id="publications" class="content-section">
-            <h2 class="section-title">Publications</h2>
-            <div class="publications-list" id="publications-container">
-                <!-- Publications will be loaded here dynamically -->
-            </div>
-        </section>
+      <section id="publications" class="content-section">
+        <h2 class="section-title">Publications</h2>
+        <div class="publications-list" id="publications-container">
+          <!-- Publications will be loaded here dynamically -->
+        </div>
+        <div class="publications-footnote">
+          * List pulled from Semantic Scholar and may be incomplete. Check my <a href="https://scholar.google.com/citations?user=YOUR_ID" target="_blank">Google Scholar</a>.
+        </div>
+      </section>
 
-        <section id="contact" class="content-section">
-            <h2 class="section-title">Contact</h2>
-            <p class="section-text">Feel free to reach out to me at: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
-        </section>
+      <section id="contact" class="content-section">
+        <h2 class="section-title">Contact</h2>
+        <div class="contact-links">
+          <a
+            href="https://bsky.app/profile/nbes.bsky.social"
+            target="_blank"
+            title="Bluesky"
+          >
+            <i class="fa-solid fa-cloud"></i>
+          </a>
+          <a href="mailto:nhbessone@gmail.com" title="nhbessone@gmail.com">
+            <i class="fas fa-envelope"></i>
+          </a>
+          <a
+            href="https://www.linkedin.com/in/nicolas-bessone-386812165/"
+            target="_blank"
+            title="LinkedIn"
+          >
+            <i class="fab fa-linkedin"></i>
+          </a>
+          <a href="https://x.com/nbesnbesnbes" target="_blank" title="Twitter">
+            <i class="fab fa-twitter"></i>
+          </a>
+        </div>
+      </section>
     </main>
 
     <footer class="site-footer">
-        <p class="footer-text">&copy; <span id="current-year"></span> Your Name. All rights reserved.</p>
+      <p class="footer-text">
+        &copy; <span id="current-year"></span> Your Name. All rights reserved.
+      </p>
     </footer>
 
     <script src="js/main.js"></script>
@@ -68,5 +139,5 @@
     <script src="js/year.js"></script>
     <script src="js/theme.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
-</body>
-</html> 
+  </body>
+</html>
