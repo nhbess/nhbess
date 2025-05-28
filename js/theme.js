@@ -65,23 +65,27 @@ function blendWithWhite(r, g, b, percent) {
 }
 
 function setMainImage(imgName) {
-    const img = document.getElementById('mainProfileImage');
-    img.crossOrigin = 'Anonymous'; // Needed for color extraction
-    img.src = `assets/images_profile/${imgName}`;
-    img.onload = function() {
+    const images = document.querySelectorAll('.profile-image');
+    const targetImage = document.querySelector(`.profile-image[data-image="${imgName}"]`);
+    const currentActive = document.querySelector('.profile-image.active');
+    
+    if (targetImage && currentActive) {
+        currentActive.classList.remove('active');
+        targetImage.classList.add('active');
+        
         try {
             const colorThief = new ColorThief();
-            let palette = colorThief.getPalette(img, 5);
-            let color = palette[1] || palette[0]; // Use second color if available, else first
+            let palette = colorThief.getPalette(targetImage, 5);
+            let color = palette[1] || palette[0];
             let brightness = getBrightness(color[0], color[1], color[2]);
             if (brightness < 150) {
-                color = blendWithWhite(color[0], color[1], color[2], 0.3); // blend 30% with white
+                color = blendWithWhite(color[0], color[1], color[2], 0.3);
             }
             setAccentColor(rgbToHex(color[0], color[1], color[2]));
         } catch (e) {
-            setAccentColor(getRandomColor()); // fallback
+            setAccentColor(getRandomColor());
         }
-    };
+    }
 }
 
 function createCirclePoints() {

@@ -194,4 +194,29 @@ a {
 
 .profile-circle-container .main-image {
     z-index: 3;
+}
+
+.profile-images-container {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin: 0 auto;
+}
+
+.profile-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    z-index: 3;
+}
+
+.profile-image.active {
+    opacity: 1;
 } 
