@@ -90,22 +90,43 @@ function setMainImage(imgName) {
 
 function createCirclePoints() {
     const pointsContainer = document.getElementById('circlePoints');
-    const containerSize = 360;
-    const mainImageSize = 220;
-    const pointSize = 30;
-    const radius = (containerSize - mainImageSize) / 2 + mainImageSize / 2 - 30;
-    const center = containerSize / 2;
+    const imageRadius = 110; // 220/2
+    const outerCircleRadius = 120; // 240/2
+    const pointRadius = 10; // 20/2
+    const gap = 20; // gap between image and point
+    const pointsRadius = outerCircleRadius + gap + pointRadius; // 120 + 20 + 10 = 150
+    const containerSize = 240; // match outer circle size
+    const center = containerSize / 2; // 120
+    const lineLength = pointsRadius - outerCircleRadius; // 150 - 120 = 30
     pointsContainer.innerHTML = '';
+    
+    // Get the currently active image
+    const activeImage = document.querySelector('.profile-image.active');
+    const activeImageName = activeImage ? activeImage.getAttribute('data-image') : profileImages[0];
+    
     profileImages.forEach((img, i) => {
         const angle = (2 * Math.PI * i) / profileImages.length;
-        const x = center + radius * Math.cos(angle) - pointSize / 2;
-        const y = center + radius * Math.sin(angle) - pointSize / 2;
+        const x = center + pointsRadius * Math.cos(angle);
+        const y = center + pointsRadius * Math.sin(angle);
         const point = document.createElement('div');
         point.className = 'circle-point';
+        if (img === activeImageName) {
+            point.classList.add('active');
+        }
         point.style.left = `${x}px`;
         point.style.top = `${y}px`;
+        point.style.setProperty('--line-length', `${lineLength}px`);
+        point.style.setProperty('--line-angle', `${angle + Math.PI}rad`);
         point.title = img;
-        point.onclick = () => setMainImage(img);
+        // Add a wrapper for scaling effect
+        const btnContent = document.createElement('div');
+        btnContent.className = 'circle-point-content';
+        point.appendChild(btnContent);
+        point.onclick = () => {
+            setMainImage(img);
+            document.querySelectorAll('.circle-point').forEach(p => p.classList.remove('active'));
+            point.classList.add('active');
+        };
         pointsContainer.appendChild(point);
     });
 }
@@ -124,13 +145,34 @@ function hexToRgb(hex) {
     };
 }
 
+// Add click handler for random theme selection
+function addImageClickHandler() {
+    const images = document.querySelectorAll('.profile-image');
+    images.forEach(image => {
+        image.addEventListener('click', () => {
+            const randomImage = profileImages[Math.floor(Math.random() * profileImages.length)];
+            setMainImage(randomImage);
+            // Update the corresponding circle point
+            document.querySelectorAll('.circle-point').forEach(point => {
+                point.classList.remove('active');
+                if (point.title === randomImage) {
+                    point.classList.add('active');
+                }
+            });
+        });
+    });
+}
+
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Wait for the particles system to be ready before setting the initial image and color
     function initWithParticles() {
         if (window.particleSystem) {
-            setMainImage(profileImages[Math.floor(Math.random() * profileImages.length)]);
+            const initialImage = profileImages[Math.floor(Math.random() * profileImages.length)];
+            setMainImage(initialImage);
             createCirclePoints();
+            // Add click handlers after images are loaded
+            setTimeout(addImageClickHandler, 100);
         } else {
             setTimeout(initWithParticles, 50);
         }

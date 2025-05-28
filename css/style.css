@@ -62,6 +62,7 @@ body {
     font-weight: 500;
     font-family: 'Space Grotesk', sans-serif;
     transition: var(--accent-color-transition);
+    font-size: 1.25em;
 }
 
 .nav-link:hover {
@@ -75,10 +76,10 @@ body {
 
 .content-section {
     margin-bottom: 4rem;
-    background-color: rgba(30, 30, 30, 0.8);
+    background-color: rgba(30, 30, 30, 0.7);
     padding: 2rem;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(5px);
 }
 
@@ -167,33 +168,57 @@ a {
 
 .circle-points {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    width: 240px;
+    height: 240px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     pointer-events: none;
+    z-index: 10;
 }
 
 .circle-point {
     position: absolute;
-    width: 30px;
-    height: 30px;
-    background: var(--accent-color);
-    border: 3px solid #fff;
-    border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    cursor: pointer;
-    transition: var(--accent-color-transition), transform 0.2s;
+    width: 20px;
+    height: 20px;
     pointer-events: auto;
-    z-index: 2;
-}
-.circle-point:hover {
-    background: var(--accent-color-hover);
-    transform: scale(1.15);
+    z-index: 20;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
 }
 
-.profile-circle-container .main-image {
-    z-index: 3;
+.circle-point-content {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--accent-color);
+    border: 2px solid #000;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    transition: transform 0.2s, background var(--accent-color-transition), border 0.2s;
+}
+
+.circle-point.active .circle-point-content {
+    border: 2px solid #fff;
+}
+
+.circle-point::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--line-length, 100%);
+    height: 2px;
+    background: var(--accent-color);
+    opacity: 0.5;
+    transform-origin: 0 0;
+    transform: rotate(var(--line-angle, 0rad));
+    z-index: -1;
 }
 
 .profile-images-container {
@@ -201,6 +226,22 @@ a {
     width: 220px;
     height: 220px;
     margin: 0 auto;
+    z-index: 3;
+}
+
+.profile-images-container::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 240px; /* 220 + 20 */
+    height: 240px;
+    transform: translate(-50%, -50%);
+    border: 2px solid var(--accent-color);
+    border-radius: 50%;
+    opacity: 0.5;
+    z-index: 1;
+    pointer-events: none;
 }
 
 .profile-image {
@@ -214,7 +255,8 @@ a {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     opacity: 0;
     transition: opacity 0.5s ease-in-out;
-    z-index: 3;
+    z-index: 2;
+    cursor: pointer;
 }
 
 .profile-image.active {
