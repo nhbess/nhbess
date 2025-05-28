@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Personal Website</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="profile-circle-container">
+            <img src="assets/images_profile/1.png" alt="Header Image" class="main-image" id="mainProfileImage">
+            <div class="circle-points" id="circlePoints"></div>
+        </div>
+        <nav class="main-nav">
+            <ul class="nav-links">
+                <li><a href="#about" class="nav-link">About</a></li>
+                <li><a href="#projects" class="nav-link">Projects</a></li>
+                <li><a href="#publications" class="nav-link">Publications</a></li>
+                <li><a href="#contact" class="nav-link">Contact</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section id="about" class="content-section">
+            <h2 class="section-title">About Me</h2>
+            <p class="section-text">Welcome to my personal website. I'm a passionate individual focused on creating meaningful experiences.</p>
+        </section>
+
+        <section id="projects" class="content-section">
+            <h2 class="section-title">Projects</h2>
+            <div class="project-cards">
+                <!-- Project cards will go here -->
+            </div>
+        </section>
+
+        <section id="publications" class="content-section">
+            <h2 class="section-title">Publications</h2>
+            <div class="publications-list" id="publications-container">
+                <!-- Publications will be loaded here dynamically -->
+            </div>
+        </section>
+
+        <section id="contact" class="content-section">
+            <h2 class="section-title">Contact</h2>
+            <p class="section-text">Feel free to reach out to me at: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p class="footer-text">&copy; <span id="current-year"></span> Your Name. All rights reserved.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/publications.js"></script>
+    <script src="js/year.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
+</body>
+</html> 
