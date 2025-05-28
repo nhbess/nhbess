@@ -61,7 +61,7 @@ body {
     color: var(--accent-color);
     font-weight: 500;
     font-family: 'Space Grotesk', sans-serif;
-    transition: color 0.3s ease;
+    transition: var(--accent-color-transition);
 }
 
 .nav-link:hover {
@@ -88,6 +88,7 @@ body {
     letter-spacing: -0.02em;
     margin-bottom: 1rem;
     color: var(--accent-color);
+    transition: var(--accent-color-transition);
 }
 
 .section-text {
@@ -145,11 +146,13 @@ body {
 :root {
     --accent-color: #4da3ff;
     --accent-color-hover: #90caf9;
+    --accent-color-transition: all 0.5s ease-in-out;
 }
 
 a {
     color: var(--accent-color);
     text-decoration: none !important;
+    transition: var(--accent-color-transition);
 }
 
 .profile-circle-container {
@@ -180,7 +183,7 @@ a {
     border-radius: 50%;
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     cursor: pointer;
-    transition: background 0.2s, transform 0.2s;
+    transition: var(--accent-color-transition), transform 0.2s;
     pointer-events: auto;
     z-index: 2;
 }
