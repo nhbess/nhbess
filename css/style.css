@@ -299,8 +299,11 @@ a {
   font-size: 1.2em;
 }
 
-.contact-list a {
-  color: inherit;
+.contact-list a,
+.contact-list a:visited,
+.contact-list a:active,
+.contact-list a:focus {
+  color: var(--accent-color);
   text-decoration: none;
   font-family: inherit;
 }
