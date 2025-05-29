@@ -63,7 +63,7 @@ function blendWithWhite(r, g, b, percent) {
     ];
 }
 
-function setMainImage(imgName) {
+function setMainImage(imgName, setColor = false) {
     const images = document.querySelectorAll('.profile-image');
     const targetImage = document.querySelector(`.profile-image[data-image="${imgName}"]`);
     const currentActive = document.querySelector('.profile-image.active');
@@ -72,17 +72,19 @@ function setMainImage(imgName) {
         currentActive.classList.remove('active');
         targetImage.classList.add('active');
         
-        try {
-            const colorThief = new ColorThief();
-            let palette = colorThief.getPalette(targetImage, 5);
-            let color = palette[1] || palette[0];
-            let brightness = getBrightness(color[0], color[1], color[2]);
-            if (brightness < 150) {
-                color = blendWithWhite(color[0], color[1], color[2], 0.3);
+        if (setColor) {
+            try {
+                const colorThief = new ColorThief();
+                let palette = colorThief.getPalette(targetImage, 5);
+                let color = palette[1] || palette[0];
+                let brightness = getBrightness(color[0], color[1], color[2]);
+                if (brightness < 150) {
+                    color = blendWithWhite(color[0], color[1], color[2], 0.3);
+                }
+                setAccentColor(rgbToHex(color[0], color[1], color[2]));
+            } catch (e) {
+                setAccentColor(getRandomColor());
             }
-            setAccentColor(rgbToHex(color[0], color[1], color[2]));
-        } catch (e) {
-            setAccentColor(getRandomColor());
         }
     }
 }
@@ -122,7 +124,7 @@ function createCirclePoints() {
         btnContent.className = 'circle-point-content';
         point.appendChild(btnContent);
         point.onclick = () => {
-            setMainImage(img);
+            setMainImage(img, true);
             document.querySelectorAll('.circle-point').forEach(p => p.classList.remove('active'));
             point.classList.add('active');
         };
@@ -149,8 +151,11 @@ function addImageClickHandler() {
     const images = document.querySelectorAll('.profile-image');
     images.forEach(image => {
         image.addEventListener('click', () => {
-            const randomImage = profileImages[Math.floor(Math.random() * profileImages.length)];
-            setMainImage(randomImage);
+            const currentActive = document.querySelector('.profile-image.active');
+            const currentImage = currentActive ? currentActive.getAttribute('data-image') : null;
+            const availableImages = profileImages.filter(img => img !== currentImage);
+            const randomImage = availableImages[Math.floor(Math.random() * availableImages.length)];
+            setMainImage(randomImage, true);
             // Update the corresponding circle point
             document.querySelectorAll('.circle-point').forEach(point => {
                 point.classList.remove('active');
@@ -168,7 +173,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function initWithParticles() {
         if (window.particleSystem) {
             const initialImage = profileImages[Math.floor(Math.random() * profileImages.length)];
-            setMainImage(initialImage);
+            const targetImage = document.querySelector(`.profile-image[data-image="${initialImage}"]`);
+            if (targetImage && !targetImage.complete) {
+                targetImage.addEventListener('load', function onImgLoad() {
+                    setMainImage(initialImage, true); // Set color from image after it loads
+                    targetImage.removeEventListener('load', onImgLoad);
+                });
+            } else {
+                setMainImage(initialImage, true); // Image already loaded
+            }
             createCirclePoints();
             // Add click handlers after images are loaded
             setTimeout(addImageClickHandler, 100);
