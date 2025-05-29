@@ -1,5 +1,7 @@
 // Function to fetch and display publications
 async function loadPublications() {
+    const spinner = document.getElementById('publications-spinner');
+    if (spinner) spinner.style.display = '';
     try {
         // Using Semantic Scholar API to fetch publications
         const response = await fetch('https://api.semanticscholar.org/graph/v1/author/2299559532/papers?fields=title,authors,venue,year,abstract,url,citationCount,publicationVenue,publicationDate,fieldsOfStudy,openAccessPdf');
@@ -72,6 +74,8 @@ async function loadPublications() {
         console.error('Error loading publications:', error);
         document.getElementById('publications-container').innerHTML = 
             '<p class="error-message">Failed to load publications. Please try again later or check my <a href="https://scholar.google.com/citations?user=xnRLzlUAAAAJ&hl=en" target="_blank">Google Scholar profile</a>.</p>';
+    } finally {
+        if (spinner) spinner.style.display = 'none';
     }
 }
 
