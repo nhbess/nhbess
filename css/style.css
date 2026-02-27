@@ -125,6 +125,7 @@ body {
 .project-card-thumb {
     width: 100%;
     aspect-ratio: 16 / 9;
+    max-height: 180px;
     overflow: hidden;
     background: #0e0e14;
     flex-shrink: 0;
