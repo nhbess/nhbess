@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3-Attractor Dynamical Simulator</title>
+  <style>
+    html, body { height: 100%; margin: 0; background:#0b0b0f; color:#eaeaf0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { display: grid; grid-template-columns: 1fr 320px; height: 100%; }
+    canvas { width: 100%; height: 100%; display:block; background:#0b0b0f; }
+    .panel { padding: 14px; border-left: 1px solid #222; background:#0e0e14; }
+    .panel h1 { font-size: 16px; margin: 0 0 10px; }
+    .row { margin: 10px 0; }
+    label { display:block; font-size: 12px; opacity: .9; margin-bottom: 6px; }
+    input[type="range"] { width: 100%; }
+    .hint { font-size: 12px; opacity: .75; line-height: 1.35; }
+    button { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid #2a2a35; background:#141421; color:#eaeaf0; border-radius: 8px; cursor: pointer; }
+    button:hover { background:#1a1a2a; }
+    .kv { font-size: 12px; opacity: .85; }
+    .kv code { color:#b6f; }
+    .regime-box { margin-top: 12px; padding: 10px 12px; border: 1px solid #2a2a35; border-radius: 8px; background: #0b0b12; }
+    .regime-name { font-size: 13px; font-weight: 600; color: #b6f; letter-spacing: 0.03em; margin-bottom: 6px; }
+    .regime-bars { display: flex; gap: 4px; margin-bottom: 6px; }
+    .regime-bar { flex: 1; height: 4px; border-radius: 2px; background: #222; overflow: hidden; }
+    .regime-bar-fill { height: 100%; border-radius: 2px; transition: width 0.08s; }
+    .regime-meta { font-size: 11px; opacity: .6; }
+    #soundBtn { background: #0d1a10; border-color: #1e4428; color: #5dba6e; }
+    #soundBtn.active { background: #0f2215; border-color: #2e6e40; color: #7de89a; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="c"></canvas>
+
+    <div class="panel">
+      <h1>3-Attractor Field</h1>
+
+      <div class="row">
+        <label>Well width σ</label>
+        <input id="sigma" type="range" min="0.10" max="1.20" step="0.01" value="0.45">
+      </div>
+
+      <div class="row">
+        <label>Swirl ω</label>
+        <input id="omega" type="range" min="0.00" max="3.50" step="0.01" value="1.20">
+      </div>
+
+      <div class="row">
+        <label>Input gain k (mouse/keys)</label>
+        <input id="k" type="range" min="0.00" max="6.00" step="0.01" value="2.20">
+      </div>
+
+      <button id="soundBtn">▶ Enable Sound</button>
+
+      <div class="row">
+        <label>Volume</label>
+        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.55">
+      </div>
+
+      <div class="regime-box">
+        <div class="regime-name" id="regimeName">—</div>
+        <div class="regime-bars">
+          <div class="regime-bar"><div class="regime-bar-fill" id="rbar0" style="width:0%;background:#7b8cde"></div></div>
+          <div class="regime-bar"><div class="regime-bar-fill" id="rbar1" style="width:0%;background:#de8c7b"></div></div>
+          <div class="regime-bar"><div class="regime-bar-fill" id="rbar2" style="width:0%;background:#7bde9f"></div></div>
+        </div>
+        <div class="regime-meta" id="regimeMeta">touch the canvas to start</div>
+      </div>
+
+      <p class="hint">
+        A dynamical system with three musical attractors.<br><br>
+        <strong>A1</strong> (top-left) — C Major pad. Slow, tonal, harmonic.<br>
+        <strong>A2</strong> (top-right) — D Dorian groove. Fast, rhythmic, driven.<br>
+        <strong>A3</strong> (bottom) — A pentatonic ambient. Sparse, open, drifting.<br><br>
+        The dot follows the field. <strong>Drag</strong> to bend the field toward your intention — the system decides how far it follows.<br><br>
+        <code>x</code> → harmonic space &nbsp;·&nbsp; <code>y</code> → rhythmic density
+      </p>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  const elSigma = document.getElementById('sigma');
+  const elOmega = document.getElementById('omega');
+  const elK = document.getElementById('k');
+
+  let W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    W = canvas.clientWidth * DPR;
+    H = canvas.clientHeight * DPR;
+    canvas.width = W;
+    canvas.height = H;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // World coordinates are in roughly [-2, 2] square.
+  const world = { xmin: -2.2, xmax: 2.2, ymin: -2.0, ymax: 2.0 };
+
+  function w2s(x, y) {
+    const sx = (x - world.xmin) / (world.xmax - world.xmin) * W;
+    const sy = (1 - (y - world.ymin) / (world.ymax - world.ymin)) * H;
+    return [sx, sy];
+  }
+  function s2w(sx, sy) {
+    const x = world.xmin + (sx / W) * (world.xmax - world.xmin);
+    const y = world.ymin + (1 - (sy / H)) * (world.ymax - world.ymin);
+    return [x, y];
+  }
+
+  // Three attractor centers in world coords.
+  const centers = [
+    { x: -1.1, y:  0.8 },
+    { x:  1.0, y:  0.6 },
+    { x:  0.0, y: -0.9 }
+  ];
+
+  let z = { x: -0.2, y: 0.0 };
+  let mouseDown = false;
+  let mouseWorld = { x: 0, y: 0 };
+
+  // Ring-buffer trail: stores last TRAIL_MAX world positions
+  const TRAIL_MAX = 400;
+  const trailX = new Float32Array(TRAIL_MAX);
+  const trailY = new Float32Array(TRAIL_MAX);
+  let trailHead = 0;
+  let trailLen = 0;
+
+  function pushTrail(x, y) {
+    trailX[trailHead] = x;
+    trailY[trailHead] = y;
+    trailHead = (trailHead + 1) % TRAIL_MAX;
+    if (trailLen < TRAIL_MAX) trailLen++;
+  }
+
+  function clearTrail() { trailLen = 0; trailHead = 0; }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    mouseDown = true;
+    canvas.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    const [x, y] = s2w((e.clientX - rect.left) * DPR, (e.clientY - rect.top) * DPR);
+    mouseWorld.x = x; mouseWorld.y = y;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const [x, y] = s2w((e.clientX - rect.left) * DPR, (e.clientY - rect.top) * DPR);
+    mouseWorld.x = x; mouseWorld.y = y;
+  });
+  canvas.addEventListener('pointerup', () => { mouseDown = false; });
+
+  // Compute ∇V for: V(z) = - Σ exp(-||z-ci||^2/(2σ^2)) + λ ||z||^2
+  function gradV(x, y, sigma) {
+    const s2 = sigma * sigma;
+    let gx = 0;
+    let gy = 0;
+
+    for (const c of centers) {
+      const dx = x - c.x;
+      const dy = y - c.y;
+      const r2 = dx*dx + dy*dy;
+      const e = Math.exp(-r2 / (2 * s2));
+      // grad of (-e) is: + e * (dx/s2, dy/s2)
+      gx += e * (dx / s2);
+      gy += e * (dy / s2);
+    }
+    return { gx, gy };
+  }
+
+  // Vector field: zdot = -∇V + ω R ∇V + k u
+  // R(gx,gy) = (-gy, gx)
+  function f(x, y) {
+    const sigma = parseFloat(elSigma.value);
+    const omega = parseFloat(elOmega.value);
+    const k = parseFloat(elK.value);
+
+    const { gx, gy } = gradV(x, y, sigma);
+
+    let vx = -gx + omega * (-gy);
+    let vy = -gy + omega * ( gx);
+
+    if (mouseDown) {
+      vx += k * (mouseWorld.x - x);
+      vy += k * (mouseWorld.y - y);
+    }
+
+    return { vx, vy };
+  }
+
+  // RK4 integrator step
+  function rk4Step(z, dt) {
+    const k1 = f(z.x, z.y);
+    const k2 = f(z.x + 0.5*dt*k1.vx, z.y + 0.5*dt*k1.vy);
+    const k3 = f(z.x + 0.5*dt*k2.vx, z.y + 0.5*dt*k2.vy);
+    const k4 = f(z.x + dt*k3.vx, z.y + dt*k3.vy);
+
+    z.x += (dt/6) * (k1.vx + 2*k2.vx + 2*k3.vx + k4.vx);
+    z.y += (dt/6) * (k1.vy + 2*k2.vy + 2*k3.vy + k4.vy);
+
+    // soft bounds
+    z.x = Math.max(world.xmin, Math.min(world.xmax, z.x));
+    z.y = Math.max(world.ymin, Math.min(world.ymax, z.y));
+  }
+
+  function drawField() {
+    const cols = 28;
+    const rows = 22;
+    for (let ix = 0; ix <= cols; ix++) {
+      for (let iy = 0; iy <= rows; iy++) {
+        const wx = world.xmin + (ix / cols) * (world.xmax - world.xmin);
+        const wy = world.ymin + (iy / rows) * (world.ymax - world.ymin);
+        const { vx, vy } = f(wx, wy);
+        const mag = Math.sqrt(vx * vx + vy * vy) || 1;
+        const norm = { x: vx / mag, y: vy / mag };
+
+        const len = 14 * DPR;
+        const [sx, sy] = w2s(wx, wy);
+        const ex = sx + norm.x * len;
+        const ey = sy - norm.y * len;
+
+        const alpha = Math.min(1, 0.12 + 0.28 * Math.tanh(mag * 0.15));
+        ctx.strokeStyle = `rgba(160,160,165,${alpha.toFixed(3)})`;
+        ctx.lineWidth = DPR;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+
+        // arrowhead
+        const angle = Math.atan2(-(ey - sy), ex - sx);
+        const hs = 5 * DPR;
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - hs * Math.cos(angle - 0.4), ey + hs * Math.sin(angle - 0.4));
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - hs * Math.cos(angle + 0.4), ey + hs * Math.sin(angle + 0.4));
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawTrail() {
+    const n = trailLen;
+    for (let i = 0; i < n; i++) {
+      const idx = (trailHead - n + i + TRAIL_MAX) % TRAIL_MAX;
+      const t = i / (n - 1 || 1); // 0 = oldest, 1 = newest
+      const alpha = t * t * 0.8;  // quadratic: guaranteed zero at oldest end
+      if (alpha < 0.005) continue;
+      const [sx, sy] = w2s(trailX[idx], trailY[idx]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.5 * DPR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,210,120,${alpha.toFixed(3)})`;
+      ctx.fill();
+    }
+  }
+
+  function drawOverlays() {
+    for (let i = 0; i < centers.length; i++) {
+      const c = centers[i];
+      const [sx, sy] = w2s(c.x, c.y);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 7*DPR, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(180,180,255,0.9)';
+      ctx.fill();
+      ctx.font = `${12*DPR}px system-ui`;
+      ctx.fillStyle = 'rgba(230,230,245,0.85)';
+      ctx.fillText(`A${i+1}`, sx + 10*DPR, sy - 10*DPR);
+    }
+    if (mouseDown) {
+      const [mx, my] = w2s(mouseWorld.x, mouseWorld.y);
+      ctx.beginPath();
+      ctx.arc(mx, my, 6*DPR, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 2*DPR;
+      ctx.stroke();
+    }
+  }
+
+  function drawAxes() {
+    const pad   = 44 * DPR;
+    const len   = 140 * DPR;
+    const hs    = 16 * DPR;  // arrowhead size
+    const ox    = pad;
+    const oy    = H - pad;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(200,200,210,0.55)';
+    ctx.fillStyle   = 'rgba(200,200,210,0.55)';
+    ctx.lineWidth   = 2.5 * DPR;
+    ctx.font        = `${15 * DPR}px system-ui`;
+
+    // X axis (rightward)
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + len, oy);
+    ctx.stroke();
+    // arrowhead X
+    ctx.beginPath();
+    ctx.moveTo(ox + len, oy);
+    ctx.lineTo(ox + len - hs, oy - hs * 0.45);
+    ctx.lineTo(ox + len - hs, oy + hs * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    // label X
+    ctx.fillStyle = 'rgba(200,200,210,0.55)';
+    ctx.textAlign = 'center';
+    ctx.fillText('harmonic space', ox + len * 0.5, oy + 24 * DPR);
+
+    // Y axis (upward)
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox, oy - len);
+    ctx.stroke();
+    // arrowhead Y
+    ctx.beginPath();
+    ctx.moveTo(ox, oy - len);
+    ctx.lineTo(ox - hs * 0.45, oy - len + hs);
+    ctx.lineTo(ox + hs * 0.45, oy - len + hs);
+    ctx.closePath();
+    ctx.fill();
+    // label Y (rotated)
+    ctx.save();
+    ctx.translate(ox - 24 * DPR, oy - len * 0.5);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('rhythmic density', 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  function drawPoint() {
+    const [sx, sy] = w2s(z.x, z.y);
+    ctx.beginPath();
+    ctx.arc(sx, sy, 5*DPR, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,210,120,0.95)';
+    ctx.fill();
+    const vel = f(z.x, z.y);
+    const scale = 0.07;
+    const [sx2, sy2] = w2s(z.x + scale*vel.vx, z.y + scale*vel.vy);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx2, sy2);
+    ctx.strokeStyle = 'rgba(255,210,120,0.6)';
+    ctx.lineWidth = 2*DPR;
+    ctx.stroke();
+  }
+
+  // ─── MUSIC SYSTEM ────────────────────────────────────────────────────────────
+
+  const REGIMES = [
+    {
+      label: 'A1 · C Major · Pad',
+      root: 60, intervals: [0,2,4,5,7,9,11],
+      wave: 'triangle',
+      atk: 0.07, rel: 0.55, dur: 0.85, vel: 0.16,
+      rateMin: 0.5, rateMax: 2.2,
+      color: '#7b8cde',
+    },
+    {
+      label: 'A2 · D Dorian · Groove',
+      root: 62, intervals: [0,2,3,5,7,9,10],
+      wave: 'sawtooth',
+      atk: 0.008, rel: 0.09, dur: 0.14, vel: 0.09,
+      rateMin: 2.8, rateMax: 9.0,
+      color: '#de8c7b',
+    },
+    {
+      label: 'A3 · A Penta · Ambient',
+      root: 57, intervals: [0,3,5,7,10],
+      wave: 'sine',
+      atk: 0.14, rel: 1.1, dur: 1.6, vel: 0.11,
+      rateMin: 0.18, rateMax: 1.0,
+      color: '#7bde9f',
+    },
+  ];
+
+  const elSoundBtn = document.getElementById('soundBtn');
+  const elVolume   = document.getElementById('volume');
+  const elRegimeName = document.getElementById('regimeName');
+  const elRegimeMeta = document.getElementById('regimeMeta');
+  const rBars = [0,1,2].map(i => document.getElementById(`rbar${i}`));
+
+  let audioCtx = null, masterGain = null, reverbSend = null, reverbReturn = null;
+  let audioEnabled = false;
+  let nextNoteTime = 0;
+  const LOOKAHEAD = 0.12;
+
+  function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function buildReverb(ctx) {
+    const rate = ctx.sampleRate;
+    const len  = Math.round(rate * 2.2);
+    const buf  = ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8);
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = buf;
+    return conv;
+  }
+
+  function initAudio() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx   = new AC();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = parseFloat(elVolume.value);
+    masterGain.connect(audioCtx.destination);
+
+    const conv = buildReverb(audioCtx);
+    reverbSend   = audioCtx.createGain(); reverbSend.gain.value = 0.32;
+    reverbReturn = audioCtx.createGain(); reverbReturn.gain.value = 0.9;
+    reverbSend.connect(conv);
+    conv.connect(reverbReturn);
+    reverbReturn.connect(masterGain);
+
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    audioEnabled = true;
+  }
+
+  elVolume.addEventListener('input', () => {
+    if (masterGain) masterGain.gain.value = parseFloat(elVolume.value);
+  });
+
+  function enableSound() {
+    if (!audioEnabled) {
+      initAudio();
+      elSoundBtn.textContent = '■ Sound On';
+      elSoundBtn.classList.add('active');
+    }
+  }
+
+  function toggleSound() {
+    if (!audioEnabled) {
+      enableSound();
+    } else {
+      audioEnabled = false;
+      audioCtx.suspend();
+      elSoundBtn.textContent = '▶ Enable Sound';
+      elSoundBtn.classList.remove('active');
+    }
+  }
+
+  elSoundBtn.addEventListener('click', toggleSound);
+
+  // Auto-start audio on first canvas interaction (satisfies browser gesture requirement)
+  canvas.addEventListener('pointerdown', () => enableSound(), { once: true });
+
+  // Compute blend weights and dominant regime from current z
+  function getMusicalState() {
+    const dists = centers.map(c => Math.hypot(z.x - c.x, z.y - c.y));
+    const domIdx = dists.indexOf(Math.min(...dists));
+
+    // Softmax blend with σ=0.7
+    const inv = dists.map(d => Math.exp(-d * d / (2 * 0.7 * 0.7)));
+    const sum  = inv.reduce((a, b) => a + b, 0);
+    const w    = inv.map(v => v / sum);
+
+    const regime = REGIMES[domIdx];
+
+    // x → pitch: span 2 octaves of the dominant scale
+    const n       = regime.intervals.length;
+    const xNorm   = (z.x - world.xmin) / (world.xmax - world.xmin);
+    const degIdx  = Math.min(Math.floor(xNorm * n * 2), n * 2 - 1);
+    const semitone = regime.intervals[degIdx % n] + Math.floor(degIdx / n) * 12;
+    const midi    = regime.root + semitone;
+
+    // y → note rate: low y = slow, high y = fast
+    const yNorm   = (z.y - world.ymin) / (world.ymax - world.ymin);
+    const rate    = regime.rateMin + yNorm * (regime.rateMax - regime.rateMin);
+    const interval = 1.0 / Math.max(0.05, rate);
+
+    return { domIdx, regime, midi, interval, w };
+  }
+
+  function fireNote(time, regime, midi) {
+    const freq = midiToFreq(midi);
+    const osc  = audioCtx.createOscillator();
+    const env  = audioCtx.createGain();
+
+    osc.type = regime.wave;
+    osc.frequency.value = freq;
+    osc.connect(env);
+    env.connect(masterGain);
+    env.connect(reverbSend);
+
+    const { atk, rel, dur, vel } = regime;
+    env.gain.setValueAtTime(0, time);
+    env.gain.linearRampToValueAtTime(vel, time + atk);
+    env.gain.setValueAtTime(vel, time + atk);
+    env.gain.exponentialRampToValueAtTime(vel * 0.35, time + atk + dur * 0.4);
+    env.gain.exponentialRampToValueAtTime(0.0001, time + atk + dur + rel);
+
+    osc.start(time);
+    osc.stop(time + atk + dur + rel + 0.05);
+  }
+
+  function scheduleNotes() {
+    if (!audioEnabled || !audioCtx || audioCtx.state !== 'running') return;
+    const { regime, midi, interval } = getMusicalState();
+    while (nextNoteTime < audioCtx.currentTime + LOOKAHEAD) {
+      fireNote(nextNoteTime, regime, midi);
+      nextNoteTime += interval;
+    }
+  }
+
+  function updateRegimeUI() {
+    const { domIdx, regime, w } = getMusicalState();
+    elRegimeName.textContent = regime.label;
+    elRegimeName.style.color = regime.color;
+    rBars.forEach((bar, i) => { bar.style.width = (w[i] * 100).toFixed(1) + '%'; });
+    const yNorm = (z.y - world.ymin) / (world.ymax - world.ymin);
+    const rate  = (regime.rateMin + yNorm * (regime.rateMax - regime.rateMin)).toFixed(1);
+    elRegimeMeta.textContent = `${rate} notes/s · ${audioEnabled ? 'playing' : 'muted'}`;
+  }
+
+  let lastT = performance.now();
+  function loop(t) {
+    const dtReal = (t - lastT) / 1000;
+    lastT = t;
+    const dt = 1/120;
+    const steps = Math.max(1, Math.min(8, Math.floor(dtReal / dt)));
+
+    for (let i = 0; i < steps; i++) {
+      pushTrail(z.x, z.y);
+      rk4Step(z, dt);
+    }
+
+    // Layer order: solid bg → field (always on top of bg) → trail → point labels
+    ctx.fillStyle = 'rgb(11,11,15)';
+    ctx.fillRect(0, 0, W, H);
+    drawField();
+    drawTrail();
+    drawOverlays();
+    drawAxes();
+    drawPoint();
+
+    scheduleNotes();
+    updateRegimeUI();
+
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
