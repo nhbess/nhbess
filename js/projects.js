@@ -11,6 +11,14 @@
  */
 const PROJECTS = [
   {
+    title: "Micro-Macro Criticality",
+    description:
+      "Live multi-agent simulation exploring how micro-level reservoir dynamics (branching ratio σ) relate to macro-level criticality. 256 agents with 64-neuron reservoirs interact via local light signals; avalanche statistics and criticality scores are computed in real time across a sweep of parameters.",
+    tags: ["Swarm Intelligence", "Criticality", "Reservoir Computing", "Interactive"],
+    thumbnail: "assets/images_projects/live_viewer.png",
+    link: "projects/live_viewer/index.html",
+  },
+  {
     title: "3-Attractor Dynamical Simulator",
     description:
       "A dynamical system with three musical attractors. The state follows a gradient field; drag the canvas to bend it toward your intention. Sound is synthesised in real-time from the system's position in harmonic/rhythmic space.",
