@@ -6,6 +6,7 @@
   --border-default:    #2a2a2a;
   --node-off:          #56176b;
   --node-on:           #fcffa4;
+  --plfit-duration:    #e77436;
   --shadow-highlight:  0 0 6px rgba(249,169,10,.5);
   --edge-adjacency:    rgba(201, 46, 209, 0.55);
   --flash-reinit:      rgba(231,116,36,1);
@@ -158,7 +159,8 @@ button:hover{background:var(--border-default)}
 
 #res-demo-wrap,
 #macro-demo-wrap,
-#av-extr-demo-wrap{
+#av-extr-demo-wrap,
+#plfit-demo-wrap{
   background:var(--surface-base);
   border:none;
   border-radius:6px;
@@ -170,7 +172,9 @@ button:hover{background:var(--border-default)}
 
 #res-demo-canvas,
 #macro-demo-canvas,
-#av-extr-canvas{
+#av-extr-canvas,
+#plfit-canvas-manual,
+#plfit-canvas-paper{
   width:100%;
   height:220px;
   display:block;
@@ -233,12 +237,18 @@ button:hover{background:var(--border-default)}
 
 .about-center{display:flex;align-items:center;justify-content:center;gap:8px}
 .about-btn-row{display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
-#av-extr-demo-wrap .about-center{
+#av-extr-demo-wrap .about-center,
+#plfit-demo-wrap .about-center{
   flex-direction:column;
   align-items:center;
 }
-#av-extr-info{
+#av-extr-info,
+.about-demo-info{
   text-align:center;
+  font-size:.78rem;
+  color:var(--text-muted);
+  line-height:1.45;
+  min-height:1.45em;
 }
 #res-demo-info:empty,
 #macro-demo-info:empty{
@@ -258,4 +268,157 @@ button:hover{background:var(--border-default)}
 .about-btn:hover{
   background:rgba(252,255,164,.16);
   border-color:rgba(252,255,164,.7);
+}
+.about-btn:disabled{
+  opacity:.55;
+  cursor:wait;
+  pointer-events:none;
+}
+
+#plfit-demo-wrap .plfit-demo-lead{
+  text-align:left;
+  max-width:100%;
+}
+
+.plfit-practical{
+  margin-top:4px;
+}
+
+.plfit-stats-hd{
+  font-size:.68rem;
+  color:var(--text-muted);
+  margin:6px 0 4px;
+  letter-spacing:.03em;
+  line-height:1.35;
+  min-height:2.85em;
+}
+.plfit-xmin-row{
+  margin-top:4px;
+}
+.plfit-paper-cols{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px 20px;
+  width:100%;
+  align-items:start;
+}
+.plfit-paper-col.plfit-stats{
+  gap:5px;
+}
+.plfit-paper-col .plfit-stat-subhd{
+  margin-top:0;
+}
+@media (max-width:720px){
+  .plfit-paper-cols{
+    grid-template-columns:1fr;
+  }
+  .plfit-paper-col + .plfit-paper-col .plfit-stat-subhd{
+    margin-top:10px;
+  }
+}
+.plfit-stats{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  width:100%;
+}
+.plfit-stat-subhd{
+  color:var(--node-on);
+  font-size:.72rem;
+  font-weight:700;
+  margin-top:8px;
+  margin-bottom:1px;
+  letter-spacing:.02em;
+}
+.plfit-stat-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:8px 16px;
+  align-items:center;
+}
+.plfit-stat-k{
+  font-size:.72rem;
+  color:var(--text-muted);
+  text-align:right;
+  padding-right:2px;
+  line-height:1.35;
+}
+.plfit-stat-v{
+  font-size:.72rem;
+  text-align:left;
+  min-height:1.25em;
+  line-height:1.35;
+}
+.plfit-stat-v.plfit-stat-plain{
+  font-variant-numeric:tabular-nums;
+  color:var(--text-primary);
+}
+
+.plfit-note{
+  font-size:.78rem;
+  color:var(--text-muted);
+  line-height:1.55;
+  padding:8px 10px;
+  border:1px solid var(--border-default);
+  border-radius:8px;
+}
+
+.plfit-panels{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:flex-start;
+}
+
+.plfit-panel{
+  flex:1;
+  min-width:min(100%, 320px);
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.plfit-panel-title{
+  font-size:.78rem;
+  color:var(--node-on);
+  font-weight:700;
+  letter-spacing:.02em;
+}
+
+.plfit-fit-explain{
+  font-size:.72rem;
+  color:var(--text-muted);
+  line-height:1.5;
+  text-align:left;
+}
+
+.plfit-legend{
+  font-size:.68rem;
+  color:var(--text-muted);
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+}
+
+.plfit-legend-s::before{
+  content:"";
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--node-on);
+  margin-right:4px;
+  vertical-align:middle;
+}
+
+.plfit-legend-t::before{
+  content:"";
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--plfit-duration);
+  margin-right:4px;
+  vertical-align:middle;
 }

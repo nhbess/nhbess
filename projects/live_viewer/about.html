@@ -145,11 +145,9 @@
     $A_l(t_s-1)=0$ and $A_l(t_s)>0$, and ends at $t_e$ when
     $A_l(t_e)>0$ and $A_l(t_e+1)=0$. Its duration and size are:</p>
     <p class="math-display">$$T=t_e-t_s+1,\qquad S=\sum_{t=t_s}^{t_e}A_l(t)$$</p>
-    <p>Avalanches still active at the recording boundary are censored and excluded
-    from analysis. This extraction rule does <strong>not</strong> discard
-    avalanches by size: events with $S=1$ or $S=2$ are valid extracted
-    avalanches. Size-based exclusion applies only at the fitting stage through
-    the tail cutoff $x_{\min}$.</p>
+    <p>Avalanches still active when the recording stops are censored and excluded
+    from analysis, because the finite observation window does not show whether
+    the cascade would later return to silence.</p>
 
     <div id="av-extr-demo-wrap">
       <canvas id="av-extr-canvas"></canvas>
@@ -165,40 +163,149 @@
       <p class="eq-center">
         <strong>What is this?</strong> A single-cascade extraction demo. Press <em>Fire one cascade</em> to seed one
         active neuron at $t=0$ (left); $T$ and $S$ follow the paper definitions on
-        population activity (here: neuron count per timestep). Cascades still active
-        after 260 steps are censored. $S=1$ is a valid extracted avalanche; the
-        live preview fit simply fixes $x_{\min}=2$, so $S=1$ is excluded from that
-        fit only.
+        population activity (here: neuron count per timestep). If the cascade is still
+        active after 260 steps it is discarded (censored by the finite window). If
+        activity returns to zero before then, the event is a valid complete
+        extraction&#8212;including $T=1$, $S=1$.
+        How $x_{\min}$ enters power-law fits is described in the fitting section below.
       </p>
     </div>
 
     <h3>Power-law fitting (paper vs live preview)</h3>
-    <p><strong>Paper methodology.</strong> For each observable $x\in\{S,T\}$, the
-    paper fits a discrete power law
-    $P(x)=x^{-\alpha}/\zeta(\alpha,x_{\min})$ on the tail $x\ge x_{\min}$.
-    Here $x_{\min}$ is a <em>value threshold</em> (size/duration cutoff), not a
-    number of avalanches: all events remain in the dataset, but only events with
-    $x\ge x_{\min}$ are used in the fit. Following Clauset et al., the paper
-    scans candidate cutoffs and chooses $x_{\min}$ that minimizes the
-    Kolmogorov&#8211;Smirnov distance between empirical and model cumulative
-    distributions:
-    $F_{\mathrm{emp}}(x)=P(X\le x)$ from data and
-    $F_{\mathrm{model}}(x)=P(X\le x)$ from the fitted power law, with
-    $KS=\max_{x\ge x_{\min}}|F_{\mathrm{emp}}(x)-F_{\mathrm{model}}(x)|$.
-    After choosing $x_{\min}$, $\alpha$ is estimated by maximum likelihood on
-    that tail. These KS-based quantities also contribute to the criticality
-    score $\mathcal{L}(p^{\mathrm{micro}},v_r)$.</p>
-    <p><strong>Live viewer methodology.</strong> For responsiveness, the live
-    visualization uses a simplified fit: fixed $x_{\min}=2$ and a fast discrete
-    MLE for $\alpha$ from currently accumulated avalanches. So events with
-    $x<2$ (for example, $S=1$ or $T=1$) are still extracted and counted, but
-    excluded from the preview fit. Unlike the paper workflow, the live view does
-    <strong>not</strong> re-run the full cutoff search or KS minimization at
-    every frame; it prioritizes interactive speed over full offline inference.</p>
-    <p><strong>Practical interpretation.</strong> Use the live fit as an immediate
-    qualitative indicator while interacting with parameters. For quantitative
-    claims, see the paper repository:
+    <p>After avalanches are extracted, their sizes $S$ and durations $T$ form the
+    dataset used for fitting. The plot below is built from that kind of list, not
+    from the raster directly.</p>
+    <p>Real data rarely follows a power law across the whole range: small events
+    are often distorted by discreteness and finite-size effects. The fit is
+    therefore restricted to a tail $x\ge x_{\min}$.</p>
+    <p><strong>Paper (Clauset et al.).</strong> Sizes $S$ and durations $T$ are
+    treated as separate observables. Write $\alpha_S$ for the size exponent and
+    $\alpha_T$ for the duration exponent. For each observable and each candidate
+    lower cutoff $x_{\min}$, fit a discrete power law on the tail $x\ge x_{\min}$.</p>
+    <p><strong>Kolmogorov&#8211;Smirnov distance.</strong> Fix $x_{\min}$ and keep
+    only tail events $\{x_i \mid x_i\ge x_{\min}\}$. From these, form the empirical
+    cumulative distribution $F_{\mathrm{emp}}(x)=P(X\le x)$. Using the same
+    $x_{\min}$, estimate $\alpha_S$ or $\alpha_T$ (whichever observable is
+    being tested) by discrete maximum likelihood on that tail, and let
+    $F_{\mathrm{model}}$ be the CDF of the corresponding fitted power-law model. At
+    each admissible $x$ in the tail support, the two curves can disagree vertically;
+    the statistic is the <em>largest</em> such vertical gap:
+    $$\mathrm{KS}=\max_{x\ge x_{\min}}\bigl|F_{\mathrm{emp}}(x)-F_{\mathrm{model}}(x)\bigr|.$$
+    (For sizes this is $\mathrm{KS}_S$; for durations $\mathrm{KS}_T$.) Small
+    $\mathrm{KS}$ means the tail data and the model CDF line up well. The paper
+    tries many candidate $x_{\min}$ values and picks the cutoff that minimizes
+    $\mathrm{KS}$ (separately for $S$ and for $T$), then reports $\alpha_S$ and
+    $\alpha_T$ at those cutoffs. The criticality score
+    $\mathcal{L}(p^{\mathrm{micro}},v_r)$ combines $|\alpha_S-1.5|$,
+    $|\alpha_T-2|$, $\mathrm{KS}_S$, and $\mathrm{KS}_T$ as in the paper.</p>
+    <p><strong>Live viewer.</strong> For speed, the main simulation fixes
+    $x_{\min}=2$ and estimates $\alpha_S$ and $\alpha_T$ by the same
+    discrete MLE on the raw tails, without re-running the KS search every frame.</p>
+    <p class="plfit-practical">For quantitative claims, see the paper repository:
     <a href="https://github.com/nhbess/emergent-macro-criticality">https://github.com/nhbess/emergent-macro-criticality</a>.</p>
+
+    <div id="plfit-demo-wrap">
+      <p class="eq-center plfit-demo-lead">
+        <strong>Demo:</strong> same single-reservoir cascade rule as above. Run many
+        trials; each yields a pair $(S,T)$. The two panels use the same binned
+        log&#8211;log data but different rules for the tail cutoff $x_{\min}$.
+      </p>
+      <div class="plfit-legend">
+        <span class="plfit-legend-s">$S$ size</span>
+        <span class="plfit-legend-t">$T$ duration</span>
+      </div>
+      <div class="plfit-panels">
+        <div class="plfit-panel">
+          <p class="plfit-panel-title">Live-style: you choose one $x_{\min}$ for both $S$ and $T$</p>
+          <canvas id="plfit-canvas-manual"></canvas>
+          <p class="plfit-stats-hd">Discrete MLE on raw tail (same $x_{\min}$ for $S$ and $T$)</p>
+          <div class="plfit-stats" id="plfit-manual-stats">
+            <div class="plfit-stat-row">
+              <span class="plfit-stat-k">$x_{\min}$</span>
+              <span class="plfit-stat-v" id="plfit-manual-v-xmin"></span>
+            </div>
+            <div class="plfit-stat-row">
+              <span class="plfit-stat-k">$\alpha_S$</span>
+              <span class="plfit-stat-v" id="plfit-manual-v-as"></span>
+            </div>
+            <div class="plfit-stat-row">
+              <span class="plfit-stat-k">$\alpha_T$</span>
+              <span class="plfit-stat-v" id="plfit-manual-v-at"></span>
+            </div>
+          </div>
+          <div class="rsl-row plfit-xmin-row">
+            <span class="rsl-lbl">$x_{\min}$</span>
+            <input type="range" class="rsl-track" id="plfit-xmin-sl" min="1" max="25" value="2" step="1">
+            <span class="rsl-val" id="plfit-xmin-val">2</span>
+          </div>
+        </div>
+        <div class="plfit-panel">
+          <p class="plfit-panel-title">Paper-style: best $x_{\min}$ for $S$ and for $T$ via KS sweep</p>
+          <canvas id="plfit-canvas-paper"></canvas>
+          <p class="plfit-stats-hd">Per-observable cutoff + MLE + $\mathrm{KS}$</p>
+          <div class="plfit-paper-cols" id="plfit-paper-stats">
+            <div class="plfit-paper-col plfit-stats">
+              <div class="plfit-stat-subhd">$S$ (size)</div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$x_{\min}$</span>
+                <span class="plfit-stat-v" id="plfit-paper-s-xmin"></span>
+              </div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$\alpha_S$</span>
+                <span class="plfit-stat-v" id="plfit-paper-s-as"></span>
+              </div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$\mathrm{KS}_S$</span>
+                <span class="plfit-stat-v" id="plfit-paper-s-ks"></span>
+              </div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$n_{\mathrm{tail}}$</span>
+                <span class="plfit-stat-v" id="plfit-paper-s-n"></span>
+              </div>
+            </div>
+            <div class="plfit-paper-col plfit-stats">
+              <div class="plfit-stat-subhd">$T$ (duration)</div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$x_{\min}$</span>
+                <span class="plfit-stat-v" id="plfit-paper-t-xmin"></span>
+              </div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$\alpha_T$</span>
+                <span class="plfit-stat-v" id="plfit-paper-t-as"></span>
+              </div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$\mathrm{KS}_T$</span>
+                <span class="plfit-stat-v" id="plfit-paper-t-ks"></span>
+              </div>
+              <div class="plfit-stat-row">
+                <span class="plfit-stat-k">$n_{\mathrm{tail}}$</span>
+                <span class="plfit-stat-v" id="plfit-paper-t-n"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="rsl-row">
+        <span class="rsl-lbl">$\sigma$ (branching ratio)</span>
+        <input type="range" class="rsl-track" id="plfit-sigma-sl" min="0" max="200" value="100" step="1">
+        <span class="rsl-val" id="plfit-sigma-val">1.00</span>
+      </div>
+      <div class="about-center">
+        <div id="plfit-batch-info" class="about-demo-info"></div>
+        <button type="button" id="plfit-run-btn" class="about-btn">Run 100 cascades</button>
+      </div>
+      <p class="plfit-fit-explain">
+        <strong>Colored dots:</strong> binned empirical density in log&#8211;log space (same binning for $S$ and $T$).
+        <strong>Dashed lines:</strong> least-squares straight lines on those binned points with bin centers $\ge x_{\min}$ (visual guide only; not the discrete MLE used in the paper or in <code>index.html</code>).
+        The <strong>live simulation</strong> reports $\alpha_S$ and $\alpha_T$ by discrete MLE on <em>raw</em> events with fixed $x_{\min}=2$.
+        The <strong>paper</strong> chooses cutoffs by minimizing $\mathrm{KS}$ (see above), then discrete MLE on each tail gives $\alpha_S$ and $\alpha_T$.
+      </p>
+      <p class="plfit-note">
+        <strong>Three separate steps:</strong> (1) extract completed cascades;
+        (2) build the empirical distributions of $S$ and $T$; (3) fit only
+        $x\ge x_{\min}$&#8212;either you fix $x_{\min}$ (live preview) or the paper searches cutoffs by KS. Censored cascades are dropped.
+      </p>
+    </div>
 
   </div>
 </div>
@@ -216,6 +323,24 @@
         ],
         throwOnError: false
       });
+    }
+
+    function plfitRenderValue(el, latex) {
+      if (!el) return;
+      el.textContent = "";
+      if (latex === null || latex === undefined || latex === "") {
+        if (window.katex) {
+          katex.render("\\text{—}", el, { throwOnError: false, displayMode: false });
+        } else {
+          el.textContent = "\u2014";
+        }
+        return;
+      }
+      if (window.katex) {
+        katex.render(latex, el, { throwOnError: false, displayMode: false });
+      } else {
+        el.textContent = String(latex).replace(/\\[a-zA-Z]+/g, "").replace(/[{}]/g, "");
+      }
     }
 
     const resCanvas = document.getElementById("res-demo-canvas");
@@ -240,6 +365,25 @@
     const avExtrSigmaVal = document.getElementById("av-extr-sigma-val");
     const avExtrInfo = document.getElementById("av-extr-info");
     const avExtrFireBtn = document.getElementById("av-extr-fire-btn");
+    const plfitCanvasManual = document.getElementById("plfit-canvas-manual");
+    const plfitCanvasPaper = document.getElementById("plfit-canvas-paper");
+    const plfitXminSl = document.getElementById("plfit-xmin-sl");
+    const plfitXminVal = document.getElementById("plfit-xmin-val");
+    const plfitManualVXmin = document.getElementById("plfit-manual-v-xmin");
+    const plfitManualVAs = document.getElementById("plfit-manual-v-as");
+    const plfitManualVAt = document.getElementById("plfit-manual-v-at");
+    const plfitPaperSXmin = document.getElementById("plfit-paper-s-xmin");
+    const plfitPaperSAs = document.getElementById("plfit-paper-s-as");
+    const plfitPaperSKs = document.getElementById("plfit-paper-s-ks");
+    const plfitPaperSN = document.getElementById("plfit-paper-s-n");
+    const plfitPaperTXmin = document.getElementById("plfit-paper-t-xmin");
+    const plfitPaperTAs = document.getElementById("plfit-paper-t-as");
+    const plfitPaperTKs = document.getElementById("plfit-paper-t-ks");
+    const plfitPaperTN = document.getElementById("plfit-paper-t-n");
+    const plfitSigmaSl = document.getElementById("plfit-sigma-sl");
+    const plfitSigmaVal = document.getElementById("plfit-sigma-val");
+    const plfitRunBtn = document.getElementById("plfit-run-btn");
+    const plfitBatchInfo = document.getElementById("plfit-batch-info");
 
     const ctx = resCanvas.getContext("2d");
     let running = false;
@@ -332,16 +476,12 @@
 
     function updateAvExtrInfoAfterCascade() {
       if (!avExtrInfo) return;
-      const excludedFromPreviewFit = avExtrAccSize < 2;
       avExtrInfo.textContent =
         "Cascade result: T=" +
         avExtrAccSteps +
         ", S=" +
         avExtrAccSize +
-        ". " +
-        (excludedFromPreviewFit
-          ? "Valid avalanche; excluded from preview fit only (x_min=2)."
-          : "Complete cascade: kept (not censored).");
+        ". Complete cascade: kept (not censored).";
     }
 
     function updateAvExtrInfoCensored() {
@@ -460,6 +600,503 @@
       avExtrCtx.fillText("0", marginL, marginT + plotH + 4);
       avExtrCtx.textAlign = "right";
       avExtrCtx.fillText(String(AV_EXTR_WINDOW_T - 1), marginL + plotW, marginT + plotH + 4);
+    }
+
+    const PLFIT_N = 64;
+    const PLFIT_MAX_COLS = 260;
+    const PLFIT_TRIALS = 100;
+    const PLFIT_LOG_BINS = 18;
+
+    function plfitPFromSigma(sliderEl) {
+      const s = sliderCentiToUnit(sliderEl);
+      return s / (PLFIT_N - 1);
+    }
+
+    function plfitSimulateCascade(p) {
+      let state = new Uint8Array(PLFIT_N);
+      state[Math.floor(Math.random() * PLFIT_N)] = 1;
+      let T = 1;
+      let S = 1;
+      let cols = 1;
+      while (cols < PLFIT_MAX_COLS) {
+        const nAct = countActiveRange(state, 0, PLFIT_N);
+        if (nAct === 0) return { S, T, censored: false };
+        const nxt = new Uint8Array(PLFIT_N);
+        reservoirStepRange(state, nxt, 0, PLFIT_N, p);
+        state = nxt;
+        cols++;
+        const nxtAct = countActiveRange(state, 0, PLFIT_N);
+        if (nxtAct > 0) T++;
+        S += nxtAct;
+        if (nxtAct === 0) return { S, T, censored: false };
+      }
+      return { S, T, censored: true };
+    }
+
+    function plfitMleAlphaTail(tail, xmin) {
+      if (tail.length < 2) return NaN;
+      let denom = 0;
+      for (let i = 0; i < tail.length; i++) {
+        denom += Math.log(tail[i] / (xmin - 0.5));
+      }
+      if (!Number.isFinite(denom) || denom <= 0) return NaN;
+      return 1 + tail.length / denom;
+    }
+
+    function plfitCdfEmp(tail, x) {
+      if (!tail.length) return 0;
+      let c = 0;
+      for (let i = 0; i < tail.length; i++) if (tail[i] <= x) c++;
+      return c / tail.length;
+    }
+
+    function plfitCdfModel(alpha, xmin, xMax, x) {
+      if (!Number.isFinite(alpha) || alpha <= 1) return NaN;
+      if (x < xmin) return 0;
+      let z = 0;
+      for (let k = xmin; k <= xMax; k++) z += Math.pow(k, -alpha);
+      if (z <= 0) return NaN;
+      let s = 0;
+      const lim = Math.min(x, xMax);
+      for (let k = xmin; k <= lim; k++) s += Math.pow(k, -alpha);
+      return s / z;
+    }
+
+    function plfitKsForTail(values, xmin) {
+      const tail = [];
+      for (let i = 0; i < values.length; i++) if (values[i] >= xmin) tail.push(values[i]);
+      if (tail.length < 8) return { ks: NaN, alpha: NaN, nTail: tail.length };
+      const alpha = plfitMleAlphaTail(tail, xmin);
+      if (!Number.isFinite(alpha)) return { ks: NaN, alpha: NaN, nTail: tail.length };
+      const xMax = Math.max.apply(null, tail);
+      let ks = -1;
+      for (let x = xmin; x <= xMax; x++) {
+        const d = Math.abs(plfitCdfEmp(tail, x) - plfitCdfModel(alpha, xmin, xMax, x));
+        if (d > ks) ks = d;
+      }
+      return { ks, alpha, nTail: tail.length };
+    }
+
+    function plfitPaperPickXmin(values) {
+      let best = null;
+      const vmax = values.length ? Math.max.apply(null, values) : 0;
+      const cap = Math.min(30, vmax);
+      for (let xmin = 1; xmin <= cap; xmin++) {
+        const r = plfitKsForTail(values, xmin);
+        if (!Number.isFinite(r.ks)) continue;
+        if (!best || r.ks < best.ks) best = { xmin, ks: r.ks, alpha: r.alpha, nTail: r.nTail };
+      }
+      return best;
+    }
+
+    function plfitCombinedLogRange(sizes, durs) {
+      let minV = Infinity;
+      let maxV = 0;
+      let any = false;
+      for (let i = 0; i < sizes.length; i++) {
+        const v = sizes[i];
+        any = true;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+      for (let i = 0; i < durs.length; i++) {
+        const v = durs[i];
+        any = true;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+      if (!any || minV <= 0 || maxV <= minV) return null;
+      const logMin = Math.log10(minV);
+      const logMax = Math.log10(maxV);
+      if (logMax - logMin < 0.06) return null;
+      return { logMin, logMax };
+    }
+
+    function plfitLogLogBinsInRange(values, logMin, logMax, nBins) {
+      if (!values.length || logMax <= logMin) return null;
+      const dlog = (logMax - logMin) / nBins;
+      const counts = new Array(nBins).fill(0);
+      const n = values.length;
+      for (let i = 0; i < values.length; i++) {
+        const lx = Math.log10(values[i]);
+        if (lx < logMin || lx > logMax) continue;
+        const idx = Math.min(Math.floor((lx - logMin) / dlog), nBins - 1);
+        counts[idx]++;
+      }
+      const pts = [];
+      for (let k = 0; k < nBins; k++) {
+        if (counts[k] < 1) continue;
+        const w = Math.pow(10, logMin + (k + 1) * dlog) - Math.pow(10, logMin + k * dlog);
+        pts.push({
+          lx: logMin + (k + 0.5) * dlog,
+          ly: Math.log10(counts[k] / (n * w))
+        });
+      }
+      return pts.length ? pts : null;
+    }
+
+    function plfitOlsTail(pts, xmin) {
+      const lxCut = Math.log10(Math.max(1, xmin));
+      const sel = [];
+      for (let i = 0; i < pts.length; i++) if (pts[i].lx + 1e-12 >= lxCut) sel.push(pts[i]);
+      if (sel.length < 2) return null;
+      let sumX = 0;
+      let sumY = 0;
+      let sumXX = 0;
+      let sumXY = 0;
+      const n = sel.length;
+      for (let i = 0; i < n; i++) {
+        const p = sel[i];
+        sumX += p.lx;
+        sumY += p.ly;
+        sumXX += p.lx * p.lx;
+        sumXY += p.lx * p.ly;
+      }
+      const denom = n * sumXX - sumX * sumX;
+      if (Math.abs(denom) < 1e-14) return null;
+      const slope = (n * sumXY - sumX * sumY) / denom;
+      const intercept = (sumY - slope * sumX) / n;
+      return { slope, intercept, lxCut };
+    }
+
+    function plfitCssVar(name, fallback) {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v || fallback;
+    }
+
+    function resizePlfitCanvasEl(canvasEl) {
+      if (!canvasEl) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvasEl.getBoundingClientRect();
+      const cssW = Math.max(280, Math.floor(rect.width));
+      const cssH = Math.max(200, Math.floor(rect.height));
+      canvasEl.width = Math.floor(cssW * dpr);
+      canvasEl.height = Math.floor(cssH * dpr);
+      const ctx = canvasEl.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function drawPlfitPanel(canvasEl, sizes, durs, xminS, xminT) {
+      if (!canvasEl) return;
+      resizePlfitCanvasEl(canvasEl);
+      const ctx = canvasEl.getContext("2d");
+      const W = canvasEl.clientWidth || 320;
+      const H = canvasEl.clientHeight || 220;
+      ctx.fillStyle = "#090909";
+      ctx.fillRect(0, 0, W, H);
+
+      const marginL = 46;
+      const marginR = 10;
+      const marginT = 12;
+      const marginB = 38;
+      const plotW = Math.max(1, W - marginL - marginR);
+      const plotH = Math.max(1, H - marginT - marginB);
+
+      const colS = plfitCssVar("--node-on", "#fcffa4");
+      const colT = plfitCssVar("--plfit-duration", "#e77436");
+      const border = plfitCssVar("--border-default", "#2a2a2a");
+      const muted = plfitCssVar("--text-muted", "#666");
+
+      if (!sizes.length && !durs.length) {
+        ctx.fillStyle = muted;
+        ctx.font = "11px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("Run 100 cascades to plot S and T.", W / 2, H / 2);
+        return;
+      }
+
+      const rg = plfitCombinedLogRange(sizes, durs);
+      if (!rg) {
+        ctx.fillStyle = muted;
+        ctx.font = "11px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("Not enough spread for log–log bins (try another σ).", W / 2, H / 2);
+        return;
+      }
+
+      const ptsS = sizes.length ? plfitLogLogBinsInRange(sizes, rg.logMin, rg.logMax, PLFIT_LOG_BINS) : null;
+      const ptsT = durs.length ? plfitLogLogBinsInRange(durs, rg.logMin, rg.logMax, PLFIT_LOG_BINS) : null;
+      if (!ptsS && !ptsT) {
+        ctx.fillStyle = muted;
+        ctx.font = "11px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("No nonempty bins.", W / 2, H / 2);
+        return;
+      }
+
+      let lxMin = rg.logMin;
+      let lxMax = rg.logMax;
+      let lyMin = Infinity;
+      let lyMax = -Infinity;
+      function accPts(pts) {
+        if (!pts) return;
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (p.ly < lyMin) lyMin = p.ly;
+          if (p.ly > lyMax) lyMax = p.ly;
+        }
+      }
+      accPts(ptsS);
+      accPts(ptsT);
+      if (!Number.isFinite(lyMin) || !Number.isFinite(lyMax)) {
+        lyMin = -3;
+        lyMax = 0;
+      }
+      const pad = 0.07;
+      const xR = lxMax - lxMin || 0.1;
+      const yR = lyMax - lyMin || 0.1;
+      lxMin -= xR * pad;
+      lxMax += xR * pad;
+      lyMin -= yR * pad;
+      lyMax += yR * pad;
+
+      const toX = (lx) => marginL + ((lx - lxMin) / (lxMax - lxMin)) * plotW;
+      const toY = (ly) => marginT + (1 - (ly - lyMin) / (lyMax - lyMin)) * plotH;
+
+      function drawVLine(xminVal, color) {
+        const lx = Math.log10(Math.max(1, xminVal));
+        if (lx < lxMin || lx > lxMax) return;
+        const xx = toX(lx);
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.45;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xx, marginT);
+        ctx.lineTo(xx, marginT + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.strokeStyle = border;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(marginL, marginT, plotW, plotH);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 0.5;
+      for (let g = Math.ceil(lxMin * 10) / 10; g <= lxMax; g += 0.25) {
+        const xx = toX(g);
+        ctx.beginPath();
+        ctx.moveTo(xx, marginT);
+        ctx.lineTo(xx, marginT + plotH);
+        ctx.stroke();
+      }
+      for (let g = Math.ceil(lyMin * 10) / 10; g <= lyMax; g += 0.25) {
+        const yy = toY(g);
+        ctx.beginPath();
+        ctx.moveTo(marginL, yy);
+        ctx.lineTo(marginL + plotW, yy);
+        ctx.stroke();
+      }
+
+      if (xminS === xminT) drawVLine(xminS, "rgba(240,240,240,0.5)");
+      else {
+        drawVLine(xminS, colS);
+        drawVLine(xminT, colT);
+      }
+
+      function drawOlsLine(pts, xminCut, color) {
+        const ols = plfitOlsTail(pts, xminCut);
+        if (!ols) return;
+        const lx0 = Math.max(ols.lxCut, lxMin);
+        const lx1 = lxMax;
+        if (lx0 >= lx1) return;
+        const y0 = ols.intercept + ols.slope * lx0;
+        const y1 = ols.intercept + ols.slope * lx1;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.85;
+        ctx.lineWidth = 1.25;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(toX(lx0), toY(y0));
+        ctx.lineTo(toX(lx1), toY(y1));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(marginL, marginT, plotW, plotH);
+      ctx.clip();
+
+      if (ptsS) drawOlsLine(ptsS, xminS, colS);
+      if (ptsT) drawOlsLine(ptsT, xminT, colT);
+
+      if (ptsS) {
+        ctx.fillStyle = colS;
+        for (let i = 0; i < ptsS.length; i++) {
+          const p = ptsS[i];
+          ctx.beginPath();
+          ctx.arc(toX(p.lx), toY(p.ly), 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      if (ptsT) {
+        ctx.fillStyle = colT;
+        for (let i = 0; i < ptsT.length; i++) {
+          const p = ptsT[i];
+          ctx.beginPath();
+          ctx.rect(toX(p.lx) - 2.5, toY(p.ly) - 2.5, 5, 5);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+
+      ctx.fillStyle = muted;
+      ctx.font = "9px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("log10 (S and T)", marginL + plotW * 0.5, marginT + plotH + 6);
+      ctx.save();
+      ctx.translate(11, marginT + plotH * 0.5);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.fillText("log10 count", 0, 0);
+      ctx.restore();
+    }
+
+    let plfitLastSizes = [];
+    let plfitLastDurs = [];
+    let plfitPaperBestS = null;
+    let plfitPaperBestD = null;
+
+    function plfitRawTail(values, xmin) {
+      const t = [];
+      for (let i = 0; i < values.length; i++) if (values[i] >= xmin) t.push(values[i]);
+      return t;
+    }
+
+    function plfitFormatMle(values, xmin) {
+      const tail = plfitRawTail(values, xmin);
+      if (tail.length < 2) return null;
+      const a = plfitMleAlphaTail(tail, xmin);
+      return Number.isFinite(a) ? a : null;
+    }
+
+    function plfitUpdateManualStats(sizes, durs, xmin) {
+      if (!plfitManualVXmin) return;
+      if (!sizes.length && !durs.length) {
+        plfitRenderValue(plfitManualVXmin, null);
+        plfitRenderValue(plfitManualVAs, null);
+        plfitRenderValue(plfitManualVAt, null);
+        return;
+      }
+      const rg = plfitCombinedLogRange(sizes, durs);
+      if (!rg) {
+        plfitRenderValue(plfitManualVXmin, null);
+        plfitRenderValue(plfitManualVAs, null);
+        plfitRenderValue(plfitManualVAt, null);
+        return;
+      }
+      plfitRenderValue(plfitManualVXmin, "= " + String(xmin));
+      const aS = sizes.length ? plfitFormatMle(sizes, xmin) : null;
+      const aT = durs.length ? plfitFormatMle(durs, xmin) : null;
+      plfitRenderValue(plfitManualVAs, aS !== null ? "= " + aS.toFixed(2) : null);
+      plfitRenderValue(plfitManualVAt, aT !== null ? "= " + aT.toFixed(2) : null);
+    }
+
+    function plfitUpdatePaperStats() {
+      if (!plfitPaperSXmin) return;
+      if (!plfitPaperBestS) {
+        plfitRenderValue(plfitPaperSXmin, null);
+        plfitRenderValue(plfitPaperSAs, null);
+        plfitRenderValue(plfitPaperSKs, null);
+        plfitRenderValue(plfitPaperSN, null);
+      } else {
+        plfitRenderValue(plfitPaperSXmin, "= " + String(plfitPaperBestS.xmin));
+        plfitRenderValue(plfitPaperSAs, "= " + plfitPaperBestS.alpha.toFixed(2));
+        plfitRenderValue(plfitPaperSKs, "= " + plfitPaperBestS.ks.toFixed(3));
+        plfitRenderValue(plfitPaperSN, "= " + String(plfitPaperBestS.nTail));
+      }
+      if (!plfitPaperBestD) {
+        plfitRenderValue(plfitPaperTXmin, null);
+        plfitRenderValue(plfitPaperTAs, null);
+        plfitRenderValue(plfitPaperTKs, null);
+        plfitRenderValue(plfitPaperTN, null);
+      } else {
+        plfitRenderValue(plfitPaperTXmin, "= " + String(plfitPaperBestD.xmin));
+        plfitRenderValue(plfitPaperTAs, "= " + plfitPaperBestD.alpha.toFixed(2));
+        plfitRenderValue(plfitPaperTKs, "= " + plfitPaperBestD.ks.toFixed(3));
+        plfitRenderValue(plfitPaperTN, "= " + String(plfitPaperBestD.nTail));
+      }
+    }
+
+    function redrawPlfitManual() {
+      const xmin = Math.max(1, Math.floor(Number(plfitXminSl && plfitXminSl.value) || 2));
+      if (plfitXminVal) plfitXminVal.textContent = String(xmin);
+      drawPlfitPanel(plfitCanvasManual, plfitLastSizes, plfitLastDurs, xmin, xmin);
+      plfitUpdateManualStats(plfitLastSizes, plfitLastDurs, xmin);
+    }
+
+    function redrawPlfitPaper() {
+      const xS = plfitPaperBestS ? plfitPaperBestS.xmin : 2;
+      const xT = plfitPaperBestD ? plfitPaperBestD.xmin : 2;
+      drawPlfitPanel(plfitCanvasPaper, plfitLastSizes, plfitLastDurs, xS, xT);
+      plfitUpdatePaperStats();
+    }
+
+    function redrawPlfitAll() {
+      redrawPlfitManual();
+      redrawPlfitPaper();
+    }
+
+    function runPlfitBatch() {
+      if (!plfitRunBtn || !plfitSigmaSl) return;
+      const p = plfitPFromSigma(plfitSigmaSl);
+      const sizes = [];
+      const durs = [];
+      let censored = 0;
+      for (let t = 0; t < PLFIT_TRIALS; t++) {
+        const r = plfitSimulateCascade(p);
+        if (r.censored) censored++;
+        else {
+          sizes.push(r.S);
+          durs.push(r.T);
+        }
+      }
+      plfitLastSizes = sizes;
+      plfitLastDurs = durs;
+      plfitPaperBestS = plfitPaperPickXmin(sizes);
+      plfitPaperBestD = plfitPaperPickXmin(durs);
+      redrawPlfitAll();
+
+      if (plfitBatchInfo) {
+        plfitBatchInfo.textContent =
+          "Completed: " + String(sizes.length) + " · Censored: " + String(censored);
+      }
+    }
+
+    function initPlfitDemo() {
+      if (!plfitCanvasManual || !plfitCanvasPaper || !plfitSigmaSl || !plfitSigmaVal || !plfitRunBtn) return;
+      plfitSigmaVal.textContent = sliderCentiToUnit(plfitSigmaSl).toFixed(2);
+      plfitSigmaSl.addEventListener("input", () => {
+        plfitSigmaVal.textContent = sliderCentiToUnit(plfitSigmaSl).toFixed(2);
+      });
+      if (plfitXminSl) {
+        plfitXminSl.addEventListener("input", () => {
+          redrawPlfitManual();
+        });
+      }
+      plfitRunBtn.addEventListener("click", () => {
+        if (plfitRunBtn.disabled) return;
+        plfitRunBtn.disabled = true;
+        if (plfitBatchInfo) {
+          plfitBatchInfo.textContent = "Completed: — · Censored: —";
+        }
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            try {
+              runPlfitBatch();
+            } finally {
+              plfitRunBtn.disabled = false;
+            }
+          });
+        });
+      });
+      redrawPlfitAll();
+      if (plfitBatchInfo) plfitBatchInfo.textContent = "Completed: — · Censored: —";
     }
 
     function resetMacroState() {
@@ -831,6 +1468,7 @@
       drawResRaster();
       drawMacroAgent();
       drawAvExtrRaster();
+      redrawPlfitAll();
     });
 
     resizeResCanvas();
@@ -847,6 +1485,7 @@
       avExtrInfo.textContent = "Cascade result: T=-, S=-.";
     }
     drawAvExtrRaster();
+    initPlfitDemo();
     rafId = requestAnimationFrame(tick);
     window.addEventListener("beforeunload", () => {
       if (rafId) cancelAnimationFrame(rafId);
