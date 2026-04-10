@@ -146,9 +146,10 @@
     $A_l(t_e)>0$ and $A_l(t_e+1)=0$. Its duration and size are:</p>
     <p class="math-display">$$T=t_e-t_s+1,\qquad S=\sum_{t=t_s}^{t_e}A_l(t)$$</p>
     <p>Avalanches still active at the recording boundary are censored and excluded
-    from analysis. In power-law fitting, the tail cutoff is $x_{\min}=2$ (for
-    both $S$ and $T$); events below this cutoff are not used to estimate
-    exponents.</p>
+    from analysis. This extraction rule does <strong>not</strong> discard
+    avalanches by size: events with $S=1$ or $S=2$ are valid extracted
+    avalanches. Size-based exclusion applies only at the fitting stage through
+    the tail cutoff $x_{\min}$.</p>
 
     <div id="av-extr-demo-wrap">
       <canvas id="av-extr-canvas"></canvas>
@@ -162,30 +163,38 @@
         <button type="button" id="av-extr-fire-btn" class="about-btn">Fire one cascade</button>
       </div>
       <p class="eq-center">
-        <strong>What is this?</strong> A single-cascade extraction demo. Press
-        <em>Fire one cascade</em> to seed one event at $t=0$ (left), then read the
-        reported $T$ and $S$. Cascades that do not end within the 260-step window
-        are marked censored; events with $S=1$ are flagged as below $x_{\min}=2$
-        for fitting.
+        <strong>What is this?</strong> A single-cascade extraction demo. Press <em>Fire one cascade</em> to seed one
+        active neuron at $t=0$ (left); $T$ and $S$ follow the paper definitions on
+        population activity (here: neuron count per timestep). Cascades still active
+        after 260 steps are censored. $S=1$ is a valid extracted avalanche; the
+        live preview fit simply fixes $x_{\min}=2$, so $S=1$ is excluded from that
+        fit only.
       </p>
     </div>
 
     <h3>Power-law fitting (paper vs live preview)</h3>
-    <p><strong>Paper methodology.</strong> In the paper, avalanche size and duration
-    are fitted with a discrete power-law model
-    $P(x)=x^{-\alpha}/\zeta(\alpha,x_{\min})$ for $x\ge x_{\min}$, following the
-    Clauset framework. The cutoff $x_{\min}$ is selected by minimizing the
-    Kolmogorov&#8211;Smirnov distance, then $\alpha$ is estimated by maximum
-    likelihood on the fitted tail. The paper analysis also uses KS-based
-    goodness-of-fit terms (and related fit diagnostics) in the criticality
+    <p><strong>Paper methodology.</strong> For each observable $x\in\{S,T\}$, the
+    paper fits a discrete power law
+    $P(x)=x^{-\alpha}/\zeta(\alpha,x_{\min})$ on the tail $x\ge x_{\min}$.
+    Here $x_{\min}$ is a <em>value threshold</em> (size/duration cutoff), not a
+    number of avalanches: all events remain in the dataset, but only events with
+    $x\ge x_{\min}$ are used in the fit. Following Clauset et al., the paper
+    scans candidate cutoffs and chooses $x_{\min}$ that minimizes the
+    Kolmogorov&#8211;Smirnov distance between empirical and model cumulative
+    distributions:
+    $F_{\mathrm{emp}}(x)=P(X\le x)$ from data and
+    $F_{\mathrm{model}}(x)=P(X\le x)$ from the fitted power law, with
+    $KS=\max_{x\ge x_{\min}}|F_{\mathrm{emp}}(x)-F_{\mathrm{model}}(x)|$.
+    After choosing $x_{\min}$, $\alpha$ is estimated by maximum likelihood on
+    that tail. These KS-based quantities also contribute to the criticality
     score $\mathcal{L}(p^{\mathrm{micro}},v_r)$.</p>
-    <p><strong>Live viewer methodology.</strong> For real-time interaction, the live
-    simulation uses a simplified estimator: fixed $x_{\min}=2$ and a fast
-    closed-form discrete MLE for $\alpha$ from the currently accumulated
-    avalanches. This preview fit does <strong>not</strong> run the full
-    $x_{\min}$ search/KS optimization pipeline from the paper at every frame.
-    The goal is responsiveness during exploration, not reproducing the full
-    offline fitting workflow in real time.</p>
+    <p><strong>Live viewer methodology.</strong> For responsiveness, the live
+    visualization uses a simplified fit: fixed $x_{\min}=2$ and a fast discrete
+    MLE for $\alpha$ from currently accumulated avalanches. So events with
+    $x<2$ (for example, $S=1$ or $T=1$) are still extracted and counted, but
+    excluded from the preview fit. Unlike the paper workflow, the live view does
+    <strong>not</strong> re-run the full cutoff search or KS minimization at
+    every frame; it prioritizes interactive speed over full offline inference.</p>
     <p><strong>Practical interpretation.</strong> Use the live fit as an immediate
     qualitative indicator while interacting with parameters. For quantitative
     claims, see the paper repository:
@@ -323,15 +332,15 @@
 
     function updateAvExtrInfoAfterCascade() {
       if (!avExtrInfo) return;
-      const discardedBySize = avExtrAccSize <= 1;
+      const excludedFromPreviewFit = avExtrAccSize < 2;
       avExtrInfo.textContent =
         "Cascade result: T=" +
         avExtrAccSteps +
         ", S=" +
         avExtrAccSize +
         ". " +
-        (discardedBySize
-          ? "Discarded for fitting: S=1 is below x_min=2."
+        (excludedFromPreviewFit
+          ? "Valid avalanche; excluded from preview fit only (x_min=2)."
           : "Complete cascade: kept (not censored).");
     }
 
@@ -359,9 +368,11 @@
       reservoirStepRange(avExtrState, nxt, 0, AV_EXTR_N, avExtrP());
       avExtrState = nxt;
       avExtrHist.push(avExtrState.slice());
-      avExtrAccSteps++;
-      avExtrAccSize += countActiveRange(avExtrState, 0, AV_EXTR_N);
-      const dead = countActiveRange(avExtrState, 0, AV_EXTR_N) === 0;
+      const nxtAct = countActiveRange(avExtrState, 0, AV_EXTR_N);
+      // Duration T counts only timesteps with A(t)>0; do not extend T with the trailing silent step.
+      if (nxtAct > 0) avExtrAccSteps++;
+      avExtrAccSize += nxtAct;
+      const dead = nxtAct === 0;
       if (dead) {
         avExtrCascadeActive = false;
         updateAvExtrInfoAfterCascade();
