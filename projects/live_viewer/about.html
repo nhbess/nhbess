@@ -33,11 +33,16 @@
     produce macro-level critical-like avalanche statistics, or whether collective
     behavior is primarily constrained by interaction topology and activity
     propagation.</p>
+    <p class="plfit-practical">For quantitative claims, see the paper repository:
+    <a href="https://github.com/nhbess/emergent-macro-criticality">https://github.com/nhbess/emergent-macro-criticality</a>.</p>
 
     <h3>Reservoir · micro level</h3>
-    <p>Each agent contains an independent discrete-time stochastic reservoir with
-    $N_{\mathrm{neurons}}$ binary neurons, following the branching-process
-    formulation used in the paper. The neuron state is $s_{t,i}\in\{0,1\}$, and
+    <p>Each agent contains an independent reservoir of
+    $N_{\mathrm{neurons}}$ binary neurons. Micro-dynamics are defined by the
+    discrete-time branching-process update introduced by Beggs and Plenz
+    <a href="#ref-1" class="cite" aria-describedby="refs-heading">[1]</a>
+    for neuronal avalanches.
+    The neuron state is $s_{t,i}\in\{0,1\}$, and
     connectivity is a transmission-probability matrix $W_{i,j}\in[0,1]$. For each
     active pre-synaptic neuron, transmission events are sampled as
     $X_{t,i,j}\sim\mathrm{Bernoulli}(W_{i,j})$.</p>
@@ -63,7 +68,7 @@
     <div id="res-demo-wrap">
       <canvas id="res-demo-canvas"></canvas>
       <div class="rsl-row">
-        <span class="rsl-lbl">$N$ neurons</span>
+        <span class="rsl-lbl">$N_{\mathrm{neurons}}$</span>
         <input type="range" class="rsl-track" id="res-n-sl" min="64" max="255" value="64" step="1">
         <span class="rsl-val" id="res-n-val">64</span>
       </div>
@@ -78,7 +83,7 @@
       </div>
       <p class="eq-center">
         <strong>What is this?</strong> A single-reservoir raster (rows = neurons, columns = time)
-        under the micro rule. Use $\sigma$ and $N$ to explore regimes, and press
+        under the micro rule. Use $\sigma$ and $N_{\mathrm{neurons}}$ to explore regimes, and press
         Play/Pause to run. When activity dies out, the demo auto-reseeds; the
         brief flashing border marks a reseeding event.
       </p>
@@ -89,18 +94,12 @@
     $N_{\mathrm{agents}}$ light-signaling agents embedded in a 2D toroidal space.
     Agents interact only through local visual perception of illuminated
     neighbors, which induces a spatial interaction structure.</p>
-    <p>Each agent emits a binary light state $l_{t,i}\in\{0,1\}$. At each macro
-    step, neighbors within vision radius $v_r$ are projected into
-    $E$ egocentric angular sectors, producing a binary sensory vector. These
-    $E$ inputs are clamped to designated reservoir input neurons, and a separate
-    readout neuron determines the outgoing light state.</p>
-    <p class="math-display">$$A_l(t)=\sum_{i=1}^{N_{\mathrm{agents}}} l_i(t),\quad \sigma_{\mathrm{eff}},\quad \mathcal{L}$$</p>
-    <p>Avalanche size and duration are extracted from contiguous active epochs of
-    $A_l(t)$, then used to estimate $\sigma_{\mathrm{eff}}$ and the criticality
-    score $\mathcal{L}$.</p>
-    <p>In the paper, sweeps over $(p^{\mathrm{micro}}, v_r)$ show that macro-level
-    near-critical behavior depends on activity propagation through the
-    interaction network, and is not determined by micro criticality alone.</p>
+    <p>Each agent emits a binary light state $l_{t,i}\in\{0,1\}$, taken to be the
+    state of a single designated readout neuron in its reservoir (one binary unit,
+    not a pooled or vector-valued readout). At each macro step, neighbors within vision radius $v_r$
+    are projected into $E$ egocentric angular sectors, producing a binary sensory
+    vector. Those $E$ inputs are clamped to designated input neurons, distinct from
+    the readout.</p>
 
     <div id="macro-demo-wrap">
       <canvas id="macro-demo-canvas"></canvas>
@@ -126,8 +125,11 @@
         </div>
       </div>
       <p class="eq-center">
-        <strong>What is this?</strong> A pedagogical coupling sketch (single agent +
-        sensory sectors). Agents only receive observations from other agents when
+        <strong>What is this?</strong> A representation of one agent and its internal
+        reservoir: the inner graph is the reservoir, and the surrounding wedges are
+        exteroceptive vision sectors at radius $v_r$. The designated readout (light) neuron is drawn at the
+        center of the reservoir ring; while the agent&#8217;s light is ON, that center
+        node is drawn in bright yellow. Agents only receive observations from other agents when
         those agents are ON <em>and</em> inside the focal agent&#8217;s vision field
         ($v_r$ and angular sectors). The circular pointer represents another
         agent&#8217;s light source: gray means inactive, yellow means ON. Click or
@@ -138,8 +140,7 @@
     </div>
 
     <h3>Avalanche Extraction</h3>
-    <p>Avalanche extraction follows the paper&#8217;s event definition on population
-    activity:</p>
+    <p>Avalanche events are extracted from the population activity signal:</p>
     <p class="math-display">$$A_l(t)=\sum_{i=1}^{N_{\mathrm{agents}}} l_i(t)$$</p>
     <p>An avalanche starts at $t_s$ when
     $A_l(t_s-1)=0$ and $A_l(t_s)>0$, and ends at $t_e$ when
@@ -162,52 +163,61 @@
       </div>
       <p class="eq-center">
         <strong>What is this?</strong> A single-cascade extraction demo. Press <em>Fire one cascade</em> to seed one
-        active neuron at $t=0$ (left); $T$ and $S$ follow the paper definitions on
-        population activity (here: neuron count per timestep). If the cascade is still
-        active after 260 steps it is discarded (censored by the finite window). If
-        activity returns to zero before then, the event is a valid complete
-        extraction&#8212;including $T=1$, $S=1$.
-        How $x_{\min}$ enters power-law fits is described in the fitting section below.
+        active neuron at $t=0$ (left); $T$ and $S$ use the same population-activity
+        definitions as above (here: neuron count per timestep). If the cascade is still
+        active after 260 steps it is discarded (censored by the finite window).
       </p>
     </div>
 
-    <h3>Power-law fitting (paper vs live preview)</h3>
-    <p>After avalanches are extracted, their sizes $S$ and durations $T$ form the
-    dataset used for fitting. The plot below is built from that kind of list, not
-    from the raster directly.</p>
-    <p>Real data rarely follows a power law across the whole range: small events
-    are often distorted by discreteness and finite-size effects. The fit is
-    therefore restricted to a tail $x\ge x_{\min}$.</p>
-    <p><strong>Paper (Clauset et al.).</strong> Sizes $S$ and durations $T$ are
-    treated as separate observables. Write $\alpha_S$ for the size exponent and
-    $\alpha_T$ for the duration exponent. For each observable and each candidate
-    lower cutoff $x_{\min}$, fit a discrete power law on the tail $x\ge x_{\min}$.</p>
-    <p><strong>Kolmogorov&#8211;Smirnov distance.</strong> Fix $x_{\min}$ and keep
-    only tail events $\{x_i \mid x_i\ge x_{\min}\}$. From these, form the empirical
-    cumulative distribution $F_{\mathrm{emp}}(x)=P(X\le x)$. Using the same
-    $x_{\min}$, estimate $\alpha_S$ or $\alpha_T$ (whichever observable is
-    being tested) by discrete maximum likelihood on that tail, and let
-    $F_{\mathrm{model}}$ be the CDF of the corresponding fitted power-law model. At
-    each admissible $x$ in the tail support, the two curves can disagree vertically;
-    the statistic is the <em>largest</em> such vertical gap:
-    $$\mathrm{KS}=\max_{x\ge x_{\min}}\bigl|F_{\mathrm{emp}}(x)-F_{\mathrm{model}}(x)\bigr|.$$
-    (For sizes this is $\mathrm{KS}_S$; for durations $\mathrm{KS}_T$.) Small
-    $\mathrm{KS}$ means the tail data and the model CDF line up well. The paper
-    tries many candidate $x_{\min}$ values and picks the cutoff that minimizes
-    $\mathrm{KS}$ (separately for $S$ and for $T$), then reports $\alpha_S$ and
-    $\alpha_T$ at those cutoffs. The criticality score
-    $\mathcal{L}(p^{\mathrm{micro}},v_r)$ combines $|\alpha_S-1.5|$,
-    $|\alpha_T-2|$, $\mathrm{KS}_S$, and $\mathrm{KS}_T$ as in the paper.</p>
-    <p><strong>Live viewer.</strong> For speed, the main simulation fixes
-    $x_{\min}=2$ and estimates $\alpha_S$ and $\alpha_T$ by the same
-    discrete MLE on the raw tails, without re-running the KS search every frame.</p>
-    <p class="plfit-practical">For quantitative claims, see the paper repository:
-    <a href="https://github.com/nhbess/emergent-macro-criticality">https://github.com/nhbess/emergent-macro-criticality</a>.</p>
+    <h3>Power-law fitting</h3>
+    <p>We start from the list of avalanche observables and analyze size $S$ and duration
+    $T$ separately. Writing either one as $x\in\{S,T\}$, we follow the Clauset procedure
+    <a href="#ref-2" class="cite" aria-describedby="refs-heading">[2]</a>
+    and fit a power law only to the tail of the empirical distribution. The reason is
+    that the smallest events are typically the least well described by scaling: they are
+    strongly affected by discreteness, finite-size effects, and other non-power-law
+    structure. Therefore a lower cutoff $x_{\min}$ is introduced, and only observations
+    with $x\ge x_{\min}$ are used in the fit.</p>
+    <p>Because both avalanche size and duration are integer-valued, the fitted model is a
+    discrete probability mass: $P(x)$ is the probability assigned to each integer
+    $x$ in the tail,</p>
+    <p class="math-display">$$P(x)=\frac{x^{-\alpha}}{\zeta(\alpha,x_{\min})},\qquad x=x_{\min},x_{\min}+1,\ldots$$</p>
+    <p>where $\alpha$ is the scaling exponent. The denominator</p>
+    <p class="math-display">$$\zeta(\alpha,x_{\min})=\sum_{n=x_{\min}}^\infty n^{-\alpha}$$</p>
+    <p>is the Hurwitz zeta function. It appears because the raw decay $x^{-\alpha}$ is
+    not yet a probability distribution; it must be normalized over the allowed tail
+    values $x_{\min},x_{\min}+1,\ldots$. Dividing by $\zeta(\alpha,x_{\min})$ makes the
+    probabilities sum to $1$, so this renormalized expression is a proper discrete
+    model.</p>
+    <p>The cutoff $x_{\min}$ is chosen from the data. For each candidate value of
+    $x_{\min}$, we keep only the tail observations $x_i\ge x_{\min}$, estimate $\alpha$ by
+    maximum likelihood on that restricted sample, and compare the empirical and fitted
+    cumulative probabilities. For integer $x\ge x_{\min}$, the running total of the
+    model masses is</p>
+    <p class="math-display">$$F(x)=\sum_{t=x_{\min}}^{x}P(t)$$</p>
+    <p>so $F(x)$ is the probability (under the fitted tail model) that the next draw is
+    at most $x$. In the same way, $F_{\mathrm{emp}}(x)$ is the fraction of tail
+    observations in the sample that are $\le x$, and $F_{\mathrm{model}}(x)$ is the
+    value of the expression above using the fitted $P(x)$.</p>
+    <p>Their discrepancy is measured with the Kolmogorov&#8211;Smirnov statistic</p>
+    <p class="math-display">$$\mathrm{KS}(x_{\min})=\max_{x\ge x_{\min}}\bigl|F_{\mathrm{emp}}(x)-F_{\mathrm{model}}(x)\bigr|.$$</p>
+    <p>This is the largest vertical separation between the step functions
+    $F_{\mathrm{emp}}$ and $F_{\mathrm{model}}$ over the tail. The selected cutoff is the value of $x_{\min}$ that minimizes this
+    KS distance. In other words, we choose the threshold above which the data are best
+    matched by a discrete power-law model. Once that optimal cutoff is found, the
+    corresponding maximum-likelihood estimate of $\alpha$ is taken as the fitted
+    exponent. The same procedure is carried out independently for avalanche size $S$ and
+    avalanche duration $T$.</p>
+
+    <p><strong class="about-important-note-label">IMPORTANT NOTE:</strong> For speed and
+    responsiveness, the simulation in this web version fixes $x_{\min}=2$ and estimates
+    $\alpha_S$ and $\alpha_T$ with the same discrete maximum likelihood on the raw tail
+    data, without re-running the $\mathrm{KS}$ cutoff search on every frame. The
+    visualizations below show both methodologies.</p>
 
     <div id="plfit-demo-wrap">
       <p class="eq-center plfit-demo-lead">
-        <strong>Demo:</strong> same single-reservoir cascade rule as above. Run many
-        trials; each yields a pair $(S,T)$. The two panels use the same binned
+        <strong>Demo:</strong> Run many trials; each yields a pair $(S,T)$. The two panels use the same binned
         log&#8211;log data but different rules for the tail cutoff $x_{\min}$.
       </p>
       <div class="plfit-legend">
@@ -216,9 +226,8 @@
       </div>
       <div class="plfit-panels">
         <div class="plfit-panel">
-          <p class="plfit-panel-title">Live-style: you choose one $x_{\min}$ for both $S$ and $T$</p>
+          <p class="plfit-panel-title">Fixed <span class="info-accent">$x_{\min}$</span></p>
           <canvas id="plfit-canvas-manual"></canvas>
-          <p class="plfit-stats-hd">Discrete MLE on raw tail (same $x_{\min}$ for $S$ and $T$)</p>
           <div class="plfit-stats" id="plfit-manual-stats">
             <div class="plfit-stat-row">
               <span class="plfit-stat-k">$x_{\min}$</span>
@@ -240,9 +249,8 @@
           </div>
         </div>
         <div class="plfit-panel">
-          <p class="plfit-panel-title">Paper-style: best $x_{\min}$ for $S$ and for $T$ via KS sweep</p>
+          <p class="plfit-panel-title">Best <span class="info-accent">$x_{\min}$</span> for <span class="info-accent">$S$</span> and for <span class="info-accent">$T$</span> via <span class="info-accent">$\mathrm{KS}$</span> sweep (paper methodology)</p>
           <canvas id="plfit-canvas-paper"></canvas>
-          <p class="plfit-stats-hd">Per-observable cutoff + MLE + $\mathrm{KS}$</p>
           <div class="plfit-paper-cols" id="plfit-paper-stats">
             <div class="plfit-paper-col plfit-stats">
               <div class="plfit-stat-subhd">$S$ (size)</div>
@@ -294,18 +302,70 @@
         <div id="plfit-batch-info" class="about-demo-info"></div>
         <button type="button" id="plfit-run-btn" class="about-btn">Run 100 cascades</button>
       </div>
-      <p class="plfit-fit-explain">
-        <strong>Colored dots:</strong> binned empirical density in log&#8211;log space (same binning for $S$ and $T$).
-        <strong>Dashed lines:</strong> least-squares straight lines on those binned points with bin centers $\ge x_{\min}$ (visual guide only; not the discrete MLE used in the paper or in <code>index.html</code>).
-        The <strong>live simulation</strong> reports $\alpha_S$ and $\alpha_T$ by discrete MLE on <em>raw</em> events with fixed $x_{\min}=2$.
-        The <strong>paper</strong> chooses cutoffs by minimizing $\mathrm{KS}$ (see above), then discrete MLE on each tail gives $\alpha_S$ and $\alpha_T$.
-      </p>
-      <p class="plfit-note">
-        <strong>Three separate steps:</strong> (1) extract completed cascades;
-        (2) build the empirical distributions of $S$ and $T$; (3) fit only
-        $x\ge x_{\min}$&#8212;either you fix $x_{\min}$ (live preview) or the paper searches cutoffs by KS. Censored cascades are dropped.
-      </p>
     </div>
+
+    <h3>Criticality score</h3>
+    <p>After power-law fitting, each $(p^{\mathrm{micro}},v_r)$ configuration yields exponents
+    $\alpha_S$ and $\alpha_T$ for avalanche size and duration, together with the Kolmogorov&#8211;Smirnov
+    distances $\mathrm{KS}_S$ and $\mathrm{KS}_T$ at the selected cutoffs. To summarize how close the
+    statistics are to <em>reference critical scaling</em>, we compare $\alpha_S$ to $\frac{3}{2}$ and
+    $\alpha_T$ to $2$. In mean-field critical branching processes, $\frac{3}{2}$ is the canonical tail exponent
+    for avalanche sizes and $2$ the corresponding benchmark for avalanche durations; those values align with
+    the exponents highlighted in experimental studies of neuronal avalanches
+    <a href="#ref-1" class="cite" aria-describedby="refs-heading">[1]</a>
+    and recur in broader discussions of criticality in living neural systems
+    <a href="#ref-3" class="cite" aria-describedby="refs-heading">[3]</a>
+    and in controlled spiking neuromorphic networks
+    <a href="#ref-4" class="cite" aria-describedby="refs-heading">[4]</a>.
+    The scalar loss used in the phase-diagram analysis is</p>
+    <p class="math-display">$$\mathcal{L}(p^{\mathrm{micro}},v_r)=|\alpha_S-1.5|+|\alpha_T-2|+\mathrm{KS}_S+\mathrm{KS}_T$$</p>
+    <p>where the absolute-value terms measure mismatch to the reference exponents (written as $1.5$ and $2$ above
+    for direct comparison with numerical estimates) and the $\mathrm{KS}$ terms retain the tail goodness-of-fit
+    penalties from the Clauset procedure
+    <a href="#ref-2" class="cite" aria-describedby="refs-heading">[2]</a>.
+    Lower $\mathcal{L}$ therefore indicates exponents nearer the branching-process benchmarks together with
+    smaller KS discrepancies.</p>
+
+    <h3>Final notes about this simulator</h3>
+    <p>In the live viewer, the <strong>effective branching ratio</strong> trace and the
+    <strong>criticality-score</strong> $\mathcal{L}$ <strong>heatmap</strong> are produced from the stored outputs
+    of the paper simulations and follow the paper&#8217;s methodology. The on-screen <strong>power-law</strong>
+    readouts (avalanche log&#8211;log panel and the $\alpha_S$, $\alpha_T$ reported beside it) instead use the
+    simplified fitting procedure summarized above—fixed $x_{\min}$ and no full $\mathrm{KS}$ search every
+    frame—so the page stays fast and responsive.</p>
+    <p>For the same reason, each interactive run is capped at <strong>500 macro steps</strong> per adjacency
+    realization, shorter than the full recording used in the paper pipeline. Implementation details, parameter
+    choices, and how the archived curves and heatmap were generated are documented in the paper&#8217;s
+    repository:
+    <a href="https://github.com/nhbess/emergent-macro-criticality">https://github.com/nhbess/emergent-macro-criticality</a>.</p>
+
+    <section class="references-section" id="references" aria-labelledby="refs-heading">
+      <h2 id="refs-heading">References</h2>
+      <ol class="ref-list">
+        <li id="ref-1">
+          Beggs, J., and Plenz, D. (2003). Neuronal avalanches in neocortical circuits.
+          <em>The Journal of Neuroscience</em>, 23, 11167&#8211;11177.
+          <a href="https://doi.org/10.1523/JNEUROSCI.23-35-11167.2003">https://doi.org/10.1523/JNEUROSCI.23-35-11167.2003</a>
+        </li>
+        <li id="ref-2">
+          Clauset, A., Shalizi, C. R., and Newman, M. E. J. (2009). Power-Law Distributions in Empirical Data.
+          <em>SIAM Review</em>, 51(4):661&#8211;703.
+          <a href="https://epubs.siam.org/doi/10.1137/070710111">https://epubs.siam.org/doi/10.1137/070710111</a>
+        </li>
+        <li id="ref-3">
+          Mora, T., and Bialek, W. (2011). Are biological systems poised at criticality?
+          <em>Journal of Statistical Physics</em>, 144(2), 268&#8211;302.
+          <a href="https://doi.org/10.1007/s10955-011-0229-4">https://doi.org/10.1007/s10955-011-0229-4</a>;
+          <a href="https://arxiv.org/abs/1012.2242">arXiv:1012.2242 [q-bio]</a>
+        </li>
+        <li id="ref-4">
+          Cramer, B., Stöckel, D., Kreft, M., Wibral, M., Schemmel, J., Meier, K., and Priesemann, V. (2020).
+          Control of criticality and computation in spiking neuromorphic networks with plasticity.
+          <em>Nature Communications</em>, 11(1), 2853.
+          <a href="https://doi.org/10.1038/s41467-020-16557-5">https://doi.org/10.1038/s41467-020-16557-5</a>
+        </li>
+      </ol>
+    </section>
 
   </div>
 </div>

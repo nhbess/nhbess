@@ -24,7 +24,7 @@ body{
   gap:10px;
 }
 
-h1{font-size:.98rem;color:var(--text-muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:2px}
+h1{font-size:1.12rem;color:var(--text-muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:2px}
 #subtitle{font-size:.8rem;color:var(--text-muted);letter-spacing:1px}
 #app{width:100%;max-width:920px;display:flex;flex-direction:column;gap:10px}
 #main{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
@@ -102,13 +102,13 @@ button:hover{background:var(--border-default)}
 #info-box-modal{
   width:100%;
   max-width:920px;
-  background:var(--surface-base);
-  border:1px solid var(--border-default);
-  border-radius:6px;
-  padding:14px;
+  background:transparent;
+  border:none;
+  border-radius:0;
+  padding:16px 16px 18px;
   display:flex;
   flex-direction:column;
-  gap:12px;
+  gap:14px;
   line-height:1.65;
   font-size:.78rem;
   color:var(--text-primary);
@@ -117,12 +117,68 @@ button:hover{background:var(--border-default)}
 #info-box-modal h2,
 #info-box-modal h3{
   color:var(--node-on);
-  letter-spacing:.4px;
+  letter-spacing:.35px;
   font-weight:700;
+  line-height:1.25;
+  font-size:1.22rem;
 }
 
-#info-box-modal h2{font-size:1.02rem}
-#info-box-modal h3{font-size:.9rem;margin-top:2px}
+#info-box-modal > h2:first-child{
+  margin-top:0;
+  margin-bottom:2px;
+}
+#info-box-modal h3{
+  margin-top:0;
+  margin-bottom:2px;
+}
+#info-box-modal > h3:first-of-type{
+  margin-top:50px;
+}
+#info-box-modal > h3:not(:first-of-type){
+  margin-top:40px;
+}
+
+#info-box-modal .references-section{
+  margin-top:20px;
+  padding-top:24px;
+  border-top:1px solid var(--border-default);
+}
+#info-box-modal .references-section h2{
+  margin-top:0;
+  margin-bottom:8px;
+}
+#info-box-modal a.cite{
+  font-weight:600;
+  text-decoration:none;
+  color:var(--node-on);
+  font-size:.65em;
+  vertical-align:super;
+  line-height:0;
+  margin-left:.06em;
+}
+#info-box-modal a.cite:hover{
+  text-decoration:underline;
+}
+#info-box-modal .ref-list{
+  margin:4px 0 0;
+  padding-left:1.35rem;
+  font-size:.82rem;
+  line-height:1.55;
+  color:var(--text-primary);
+}
+#info-box-modal .ref-list li{
+  margin-bottom:.65rem;
+  padding-left:.3rem;
+}
+#info-box-modal .ref-list li[id]{
+  scroll-margin-top:12px;
+}
+
+#info-box-modal .about-important-note-label{
+  color:var(--node-on);
+  font-weight:700;
+  letter-spacing:.06em;
+}
 #info-box-modal p{
   color:var(--text-primary);
   font-size:.9rem;
@@ -168,6 +224,10 @@ button:hover{background:var(--border-default)}
   display:flex;
   flex-direction:column;
   gap:8px;
+}
+
+#res-demo-wrap .rsl-lbl{
+  min-width:158px;
 }
 
 #res-demo-canvas,
@@ -284,14 +344,6 @@ button:hover{background:var(--border-default)}
   margin-top:4px;
 }
 
-.plfit-stats-hd{
-  font-size:.68rem;
-  color:var(--text-muted);
-  margin:6px 0 4px;
-  letter-spacing:.03em;
-  line-height:1.35;
-  min-height:2.85em;
-}
 .plfit-xmin-row{
   margin-top:4px;
 }
@@ -309,6 +361,9 @@ button:hover{background:var(--border-default)}
   margin-top:0;
 }
 @media (max-width:720px){
+  .plfit-panels{
+    grid-template-columns:1fr;
+  }
   .plfit-paper-cols{
     grid-template-columns:1fr;
   }
@@ -354,25 +409,15 @@ button:hover{background:var(--border-default)}
   color:var(--text-primary);
 }
 
-.plfit-note{
-  font-size:.78rem;
-  color:var(--text-muted);
-  line-height:1.55;
-  padding:8px 10px;
-  border:1px solid var(--border-default);
-  border-radius:8px;
-}
-
 .plfit-panels{
-  display:flex;
-  flex-wrap:wrap;
-  gap:12px;
-  align-items:flex-start;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px 16px;
+  align-items:start;
 }
 
 .plfit-panel{
-  flex:1;
-  min-width:min(100%, 320px);
+  min-width:0;
   display:flex;
   flex-direction:column;
   gap:6px;
@@ -380,16 +425,15 @@ button:hover{background:var(--border-default)}
 
 .plfit-panel-title{
   font-size:.78rem;
-  color:var(--node-on);
+  color:var(--text-primary);
   font-weight:700;
   letter-spacing:.02em;
+  line-height:1.35;
+  min-height:6.5em;
+  margin:0;
 }
-
-.plfit-fit-explain{
-  font-size:.72rem;
-  color:var(--text-muted);
-  line-height:1.5;
-  text-align:left;
+.plfit-panel-title .info-accent{
+  color:var(--node-on);
 }
 
 .plfit-legend{
