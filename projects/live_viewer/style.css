@@ -138,6 +138,9 @@ button:hover{background:var(--border-default)}
   margin-top:40px;
 }
 
+#info-box-modal .about-live-sim-cta{
+  margin-top:10px;
+}
 #info-box-modal .references-section{
   margin-top:20px;
   padding-top:24px;
