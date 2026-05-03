@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Micro-Macro Criticality · Manifolds</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+  /* page-local tweaks; promote to style.css once the layout settles */
+  #mf-demo-wrap{
+    background:var(--surface-base);
+    border:none;
+    border-radius:6px;
+    padding:8px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .mf-regime-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:center;
+  }
+  .mf-regime-btn{
+    background:var(--surface-base);
+    color:var(--text-muted);
+    border:1px solid var(--border-default);
+    border-radius:4px;
+    padding:3px 10px;
+    font-family:monospace;
+    font-size:.74rem;
+    cursor:pointer;
+    letter-spacing:.04em;
+  }
+  .mf-regime-btn:hover{ background:var(--border-default); color:var(--text-primary); }
+  .mf-regime-btn.active{
+    color:var(--node-on);
+    border-color:rgba(252,255,164,.55);
+    background:rgba(252,255,164,.08);
+  }
+  .mf-panels{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    align-items:start;
+  }
+  @media (max-width:720px){ .mf-panels{ grid-template-columns:1fr; } }
+  .mf-panel{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:0;
+  }
+  .mf-panel-title{
+    font-size:.72rem;
+    color:var(--text-muted);
+    letter-spacing:.5px;
+    text-align:center;
+  }
+  #mf-raster-canvas, #mf-embed-canvas{
+    width:100%;
+    height:300px;
+    display:block;
+    border:none;
+    background:#090909;
+    cursor:grab;
+  }
+  #mf-raster-canvas{ cursor:default; }
+  #mf-embed-canvas:active{ cursor:grabbing; }
+  .mf-stats{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    gap:2px 10px;
+    font-size:.72rem;
+    color:var(--text-muted);
+    line-height:1.4;
+    max-width:420px;
+    margin:0 auto;
+  }
+  .mf-stats .v{ color:var(--node-on); font-weight:700; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="page-header">
+    <h1 class="title-inline">
+      Micro-Macro Criticality
+      <span class="subtitle-note">· Manifolds</span>
+    </h1>
+    <div><a class="back-link" href="index.html">Go to live simulation</a> &nbsp;·&nbsp; <a class="back-link" href="about.html">About</a></div>
+  </header>
+
+  <div id="info-box-modal">
+    <h2>Activity manifolds across criticality regimes</h2>
+    <p>This page treats the <strong>activity raster</strong> of a single reservoir as a
+    cloud of points in a high-dimensional state space, and asks a geometric
+    question: how does the <em>shape</em> of that cloud change between
+    <strong>subcritical</strong>, <strong>near-critical</strong> and
+    <strong>supercritical</strong> regimes?</p>
+    <p>To make the cloud visible, we use <strong>Isomap</strong>
+    <a href="#ref-tenenbaum" class="cite" aria-describedby="refs-heading">[1]</a>,
+    a nonlinear dimensionality-reduction method that preserves
+    <em>geodesic</em> distances along the data, rather than straight-line
+    distances in the ambient space as PCA does.</p>
+
+    <h3>From raster to point cloud</h3>
+    <p>Let $s_t \in \{0,1\}^{N}$ be the binary state of an $N$-neuron reservoir at
+    macro-step $t$. Recording $T$ steps gives a raster
+    $R \in \{0,1\}^{N\times T}$. We treat each <strong>column</strong> as one
+    sample, so a recording becomes a set of $T$ points in the discrete
+    hypercube $\{0,1\}^{N}$. The empirical question is what subset of that
+    hypercube is actually visited under each dynamical regime.</p>
+
+    <h3>Isomap in three steps</h3>
+    <p>Isomap recovers low-dimensional structure on the assumption that the data
+    lie near a manifold $\mathcal{M}$ embedded in the ambient space.
+    Pairwise <em>ambient</em> distances (Euclidean, Hamming, …) are reliable
+    only locally; on a curved manifold, distant points should be compared by
+    walking <em>along</em> $\mathcal{M}$ rather than across it.</p>
+    <p><strong>1. $k$-nearest-neighbors graph.</strong> Build a graph $G$ in
+    which every point is connected to its $k$ closest neighbors under an
+    ambient distance $d$. For binary rasters we use the Hamming distance
+    $d_H(s,s') = \sum_i \mathbb{1}[s_i \neq s'_i]$; the local-distance
+    assumption is that for nearby states, $d_H$ is a good proxy for the true
+    geodesic.</p>
+    <p>The parameter $k$ is the locality knob of the whole method, and the only
+    place where the geometry of the data enters Isomap. <strong>Small
+    $k$</strong> keeps edges between truly similar states, so geodesics have
+    to walk along the manifold one shell at a time — this is when Isomap
+    actually does its job and recovers curvature that PCA cannot see. If $k$
+    is too small, however, $G$ <strong>disconnects</strong> and the method is
+    only defined on its largest connected component (we report the size of
+    that component in the stats panel). <strong>Large $k$</strong> connects
+    each point to a substantial fraction of the cloud, so most pairs are
+    direct neighbors and graph distances start to coincide with straight-line
+    ambient distances; in that limit the manifold-following property is lost
+    and Isomap degenerates toward PCA. A common rule of thumb is to keep
+    $k$ in the range $\log T \lesssim k \lesssim \sqrt{T}$, which for the
+    sampling sizes used here means roughly $k \in [6,\,20]$.</p>
+    <p><strong>2. Geodesic distances.</strong> The geodesic between two points
+    is approximated by the shortest path in $G$:</p>
+    <p class="math-display">$$D_{ij} \;=\; \min_{\pi:\,i \to j} \sum_{(u,v)\in\pi} d(u,v),$$</p>
+    <p>computed e.g. with Dijkstra from each source. Long-range distances now
+    follow the manifold instead of cutting through empty ambient space.</p>
+    <p><strong>3. Classical MDS.</strong> Embed the geodesic distance matrix
+    into $\mathbb{R}^3$ by double-centering and taking the top three
+    eigenvectors:</p>
+    <p class="math-display">$$B \;=\; -\tfrac{1}{2}\,J\,D^{(2)}\,J,\qquad J = I - \tfrac{1}{T}\mathbf{1}\mathbf{1}^\top,$$</p>
+    <p>where $D^{(2)}$ is the entrywise-squared geodesic matrix. If $B$ has
+    eigenpairs $\{(\lambda_k, v_k)\}$, the 3D Isomap coordinates are
+    $Y = [\sqrt{\lambda_1}\,v_1,\ \sqrt{\lambda_2}\,v_2,\ \sqrt{\lambda_3}\,v_3]$.</p>
+    <p class="eq-center">PCA can be recovered as the special case where $D$ is
+    the Euclidean distance matrix; the Isomap-vs-PCA difference is therefore
+    entirely in the geodesic step.</p>
+
+    <h3>Reading the embedding shape</h3>
+    <p>Each point in the embedding has coordinates
+    $(\sqrt{\lambda_1}\,v_{1,i},\ \sqrt{\lambda_2}\,v_{2,i},\ \sqrt{\lambda_3}\,v_{3,i})$,
+    so the bounding box of the cloud is set entirely by the top three
+    eigenvalues of $B$. Their relative magnitudes give a direct geometric
+    reading:</p>
+    <ul style="font-size:.9rem; line-height:1.55; padding-left:1.4rem; color:var(--text-primary);">
+      <li>$\lambda_1 \gg \lambda_2,\lambda_3$ &nbsp;→&nbsp; <strong>filament</strong> (one dominant axis).</li>
+      <li>$\lambda_1 \approx \lambda_2 \gg \lambda_3$ &nbsp;→&nbsp; <strong>plane</strong> (two comparable axes, one weak).</li>
+      <li>$\lambda_1 \approx \lambda_2 \approx \lambda_3$ &nbsp;→&nbsp; <strong>3D ball / cloud</strong> (no axis dominates).</li>
+    </ul>
+    <p>The <strong>variance ratio</strong>
+    $\sum_{k\le3}\lambda_k\,/\,\mathrm{tr}(B)$ reported in the stats panel
+    quantifies how well 3 dimensions summarize the geodesic geometry. A high
+    ratio means the cloud you see is a faithful picture of the data; a low
+    ratio means there is a lot of variance hidden in $\lambda_4,\lambda_5,\ldots$
+    that the 3D view cannot show — the cloud's shape is then itself a
+    diagnostic, not the geometry.</p>
+
+    <h3>What to expect across regimes</h3>
+    <p>The micro rule is the same Beggs reservoir used elsewhere on this site
+    (see the <a class="back-link" href="about.html">About</a> page); only the
+    branching ratio $\sigma = (N-1)\,p^{\mathrm{micro}}$ changes between
+    regimes. Crucially, the weight matrix is homogeneous
+    ($W_{ij} = p^{\mathrm{micro}}$ for $i\neq j$), so the dynamics is
+    <strong>permutation-invariant</strong> in the neuron indices: the system
+    only "knows" how many neurons are active, not which specific ones. The
+    space of active states therefore decomposes into <em>shells</em> indexed
+    by $n_{\mathrm{active}}$, and within each shell the visited patterns are
+    statistically equivalent under permutation of neurons.</p>
+    <ul style="font-size:.9rem; line-height:1.55; padding-left:1.4rem; color:var(--text-primary);">
+      <li><strong>Subcritical</strong> ($\sigma &lt; 1$): cascades die fast,
+      so the recording is concentrated in a thin <em>low-activity</em> shell
+      (mostly $n_{\mathrm{active}} \in \{1,2,3\}$). Within that shell the
+      visited patterns are essentially uniformly random sparse subsets;
+      pairwise Hamming distances <strong>concentrate around a single
+      value</strong> ("concentration of measure"), so the geodesic matrix
+      has many comparable eigenvalues and the embedding looks like an
+      <strong>isotropic 3D cloud</strong> — a shadow of a high-dimensional
+      ball.</li>
+      <li><strong>Near-critical</strong> ($\sigma \approx 1$): cascades of
+      <em>all sizes</em> coexist, so the recording spans a broad range of
+      activity shells from $n_{\mathrm{active}} = 1$ up to whatever the
+      largest cascade reached. This makes <strong>$\lambda_1$ much larger
+      than the rest</strong> — its leading direction is essentially the
+      activity level (and, secondarily, the cascade phase: growing vs.
+      shrinking). The within-shell identity fluctuations split into many
+      small, roughly equal eigenvalues $\lambda_3,\lambda_4,\ldots$. The
+      result is the characteristic spectrum
+      $\lambda_1 \approx \lambda_2 \gg \lambda_3$ and a clean
+      <strong>planar embedding</strong>. This is the geometric fingerprint
+      of criticality: away from $\sigma_c$ the dynamics fills its accessible
+      state space roughly uniformly, while at $\sigma_c$ it organizes onto a
+      <strong>lower-dimensional manifold</strong>.</li>
+      <li><strong>Supercritical</strong> ($\sigma &gt; 1$): symmetric to the
+      subcritical case but on the opposite side of the hypercube. Activity
+      saturates and the recording is concentrated in a thin <em>high-activity
+      shell</em>; within that shell, identity fluctuations are again
+      isotropic. The embedding looks like a <strong>3D cloud</strong>, with
+      a comparable-eigenvalue spectrum.</li>
+    </ul>
+    <p>So the shape transition <em>cloud → plane → cloud</em> as $\sigma$
+    crosses $1$ is not an artifact of Isomap or of the sampling — it is a
+    direct readout of the dimensionality of the dynamics. The
+    variance-ratio stat typically <strong>peaks near $\sigma=1$</strong>,
+    which means the 3D embedding is most faithful to the data exactly at
+    criticality.</p>
+
+    <div id="mf-demo-wrap">
+      <div class="mf-regime-row">
+        <button type="button" class="mf-regime-btn" data-regime="sub">Subcritical &nbsp;$\sigma=0.85$</button>
+        <button type="button" class="mf-regime-btn active" data-regime="near">Near-critical &nbsp;$\sigma=1.00$</button>
+        <button type="button" class="mf-regime-btn" data-regime="super">Supercritical &nbsp;$\sigma=1.15$</button>
+      </div>
+
+      <div class="rsl-row">
+        <span class="rsl-lbl">$\sigma$ branching ratio</span>
+        <input type="range" class="rsl-track" id="mf-sigma-sl" min="40" max="160" value="100" step="1">
+        <span class="rsl-val" id="mf-sigma-val">1.00</span>
+      </div>
+      <div class="rsl-row">
+        <span class="rsl-lbl">$N$ neurons</span>
+        <input type="range" class="rsl-track" id="mf-n-sl" min="32" max="128" value="64" step="1">
+        <span class="rsl-val" id="mf-n-val">64</span>
+      </div>
+      <div class="rsl-row">
+        <span class="rsl-lbl">$T$ active states</span>
+        <input type="range" class="rsl-track" id="mf-t-sl" min="150" max="800" value="400" step="50">
+        <span class="rsl-val" id="mf-t-val">400</span>
+      </div>
+      <div class="rsl-row">
+        <span class="rsl-lbl">$k$ neighbors</span>
+        <input type="range" class="rsl-track" id="mf-k-sl" min="3" max="30" value="10" step="1">
+        <span class="rsl-val" id="mf-k-val">10</span>
+      </div>
+
+      <div class="about-center">
+        <button type="button" id="mf-run-btn" class="about-btn">Sample &amp; embed</button>
+      </div>
+
+      <div class="mf-panels">
+        <div class="mf-panel">
+          <div class="mf-panel-title">RASTER &nbsp; (rows = neurons, columns = time)</div>
+          <canvas id="mf-raster-canvas"></canvas>
+        </div>
+        <div class="mf-panel">
+          <div class="mf-panel-title">ISOMAP EMBEDDING &nbsp; (drag to rotate)</div>
+          <canvas id="mf-embed-canvas"></canvas>
+        </div>
+      </div>
+
+      <div class="mf-stats" id="mf-stats">
+        <span>regime</span><span class="v" id="mf-stat-regime">—</span>
+        <span>$\sigma$</span><span class="v" id="mf-stat-sigma">—</span>
+        <span>active states collected</span><span class="v" id="mf-stat-coll">—</span>
+        <span>cascades / sim steps</span><span class="v" id="mf-stat-cas">—</span>
+        <span>active fraction $\langle s\rangle$</span><span class="v" id="mf-stat-act">—</span>
+        <span>$\lambda_1,\lambda_2,\lambda_3$</span><span class="v" id="mf-stat-eig">—</span>
+        <span>$\sum_{k\le3}\lambda_k / \sum\lambda_k$</span><span class="v" id="mf-stat-var">—</span>
+        <span>graph connected?</span><span class="v" id="mf-stat-conn">—</span>
+      </div>
+
+      <p class="eq-center">
+        <strong>What is this?</strong> Run a single reservoir, auto-reseeding on
+        extinction, and collect $T$ <em>active</em> states (those with at least
+        one neuron on); the dead time between cascades is dropped, so the
+        cloud samples the during-activity manifold rather than collapsing onto
+        the all-zero state. The Isomap embedding then maps those $T$ binary
+        state-columns into 3D. Try walking $\sigma$ from $0.85$ to $1.15$ and
+        watch the embedding go <em>cloud → plane → cloud</em> as the dynamics
+        passes through criticality; the $\lambda_k$ row in the stats panel
+        tracks the same transition numerically.
+      </p>
+    </div>
+
+    <h3>Caveats</h3>
+    <p>The geodesic step assumes the data lie near a low-dimensional manifold
+    in the first place. In the sub- and supercritical regimes that assumption
+    is weak — the visited states fill a thin shell of the hypercube roughly
+    isotropically, with no preferred low-dimensional structure — so the
+    "cloud" embedding should be read as a diagnostic of <em>that absence of
+    structure</em> rather than as a recovered manifold. The variance ratio
+    in the stats panel typically drops in those regimes, which is the formal
+    way of saying "the 3D picture is missing a lot of the variance".</p>
+    <p>When the $k$-NN graph $G$ is disconnected, Isomap is undefined
+    globally; we report the size of the largest connected component and flag
+    the rest in the stats panel. If you make $k$ too small the graph
+    fragments; if you make it too large, Isomap degenerates toward PCA.</p>
+    <p>Isomap is also not the only choice. UMAP and diffusion maps would give
+    different — and arguably more faithful — pictures for some of these
+    regimes; they are good follow-ups once the Isomap baseline is solid.</p>
+
+    <section class="references-section" id="references" aria-labelledby="refs-heading">
+      <h2 id="refs-heading">References</h2>
+      <ol class="ref-list">
+        <li id="ref-tenenbaum">
+          Tenenbaum, J. B., de Silva, V., and Langford, J. C. (2000).
+          A global geometric framework for nonlinear dimensionality reduction.
+          <em>Science</em>, 290(5500), 2319&#8211;2323.
+          <a href="https://doi.org/10.1126/science.290.5500.2319">https://doi.org/10.1126/science.290.5500.2319</a>
+        </li>
+      </ol>
+    </section>
+  </div>
+</div>
+
+<script src="math.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.renderMathInElement) {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$",  right: "$",  display: false }
+      ],
+      throwOnError: false
+    });
+  }
+
+  // ── DOM refs ────────────────────────────────────────────────────────────
+  const sigmaSl   = document.getElementById('mf-sigma-sl');
+  const sigmaVal  = document.getElementById('mf-sigma-val');
+  const nSl       = document.getElementById('mf-n-sl');
+  const nVal      = document.getElementById('mf-n-val');
+  const tSl       = document.getElementById('mf-t-sl');
+  const tVal      = document.getElementById('mf-t-val');
+  const kSl       = document.getElementById('mf-k-sl');
+  const kVal      = document.getElementById('mf-k-val');
+  const runBtn    = document.getElementById('mf-run-btn');
+  const rasterCv  = document.getElementById('mf-raster-canvas');
+  const embedCv   = document.getElementById('mf-embed-canvas');
+  const regimeBtns = document.querySelectorAll('.mf-regime-btn');
+
+  const REGIME_SIGMA = { sub: 85, near: 100, super: 115 };
+
+  function readParams() {
+    return {
+      sigma: (+sigmaSl.value) / 100,
+      N:     +nSl.value,
+      T:     +tSl.value,
+      k:     +kSl.value,
+    };
+  }
+
+  function syncLabels() {
+    sigmaVal.textContent = ((+sigmaSl.value)/100).toFixed(2);
+    nVal.textContent     = nSl.value;
+    tVal.textContent     = tSl.value;
+    kVal.textContent     = kSl.value;
+  }
+  syncLabels();
+
+  // ── Reservoir sampling ─────────────────────────────────────────────────
+  // Run one reservoir, auto-reseeding on extinction, and only RECORD states
+  // with at least one active neuron. This is equivalent to concatenating the
+  // cascades produced over time (each reseed starts a new cascade), so the
+  // resulting raster is a sample of the "during-activity" manifold rather
+  // than being dominated by all-zero quiescence between cascades — which
+  // would otherwise collapse the Hamming geometry to a degenerate point.
+  // Returns the actual number of collected samples, which may be < T_target
+  // if we hit the step cap (e.g. a strongly subcritical run).
+  function sampleActiveStates(N, T_target, sigma) {
+    const p = sigma / Math.max(N - 1, 1);
+    const cur = new Uint8Array(N);
+    const nxt = new Uint8Array(N);
+    cur[Math.floor(Math.random() * N)] = 1;
+    const raster = new Uint8Array(T_target * N);
+    const stepCap = Math.max(2000, T_target * 80);
+    let collected = 0, totalSteps = 0, cascades = 0;
+    let prevActive = true;
+    while (collected < T_target && totalSteps < stepCap) {
+      if (countActiveRange(cur, 0, N) === 0) {
+        cur[Math.floor(Math.random()*N)] = 1;
+        if (prevActive) cascades++;     // a cascade just ended
+        prevActive = false;
+      }
+      reservoirStepRange(cur, nxt, 0, N, p);
+      cur.set(nxt);
+      totalSteps++;
+      const nAct = countActiveRange(cur, 0, N);
+      if (nAct > 0) {
+        for (let i = 0; i < N; i++) raster[collected*N + i] = cur[i];
+        collected++;
+        prevActive = true;
+      } else if (prevActive) {
+        cascades++; prevActive = false;
+      }
+    }
+    return {
+      raster: collected === T_target ? raster : raster.slice(0, collected * N),
+      T: collected,
+      totalSteps,
+      cascades,
+      requestedT: T_target,
+    };
+  }
+
+  // ── Isomap pipeline ────────────────────────────────────────────────────
+
+  // Step 1 — pairwise Hamming on raster columns (rows of the row-major raster).
+  function pairwiseHamming(raster, T, N) {
+    const D = new Float32Array(T * T);
+    for (let i = 0; i < T; i++) {
+      const oi = i * N;
+      for (let j = i + 1; j < T; j++) {
+        const oj = j * N;
+        let d = 0;
+        for (let kk = 0; kk < N; kk++) if (raster[oi+kk] !== raster[oj+kk]) d++;
+        D[i*T + j] = d; D[j*T + i] = d;
+      }
+    }
+    return D;
+  }
+
+  // Step 2a — symmetric k-NN graph as adjacency lists.
+  function kNNGraph(D, T, k) {
+    const adj = new Array(T);
+    const idx = new Array(T - 1);
+    for (let i = 0; i < T; i++) {
+      let p = 0;
+      for (let j = 0; j < T; j++) if (j !== i) idx[p++] = j;
+      idx.sort((a, b) => D[i*T + a] - D[i*T + b]);
+      const row = [];
+      const kk = Math.min(k, T - 1);
+      for (let m = 0; m < kk; m++) {
+        const j = idx[m];
+        row.push({ j, w: D[i*T + j] });
+      }
+      adj[i] = row;
+    }
+    // symmetrize: if i→j exists but j→i doesn't, add it
+    for (let i = 0; i < T; i++) {
+      for (const e of adj[i]) {
+        let found = false;
+        for (const f of adj[e.j]) if (f.j === i) { found = true; break; }
+        if (!found) adj[e.j].push({ j: i, w: e.w });
+      }
+    }
+    return adj;
+  }
+
+  // Connected components of the kNN graph.
+  function connectedComponents(adj, T) {
+    const comp = new Int32Array(T).fill(-1);
+    let cur = 0;
+    const sizes = [];
+    for (let s = 0; s < T; s++) {
+      if (comp[s] !== -1) continue;
+      const stack = [s]; comp[s] = cur; let size = 0;
+      while (stack.length) {
+        const u = stack.pop(); size++;
+        for (const e of adj[u]) if (comp[e.j] === -1) { comp[e.j] = cur; stack.push(e.j); }
+      }
+      sizes.push(size); cur++;
+    }
+    let mainComp = 0;
+    for (let c = 1; c < sizes.length; c++) if (sizes[c] > sizes[mainComp]) mainComp = c;
+    return { comp, sizes, components: sizes.length, mainComp, mainSize: sizes[mainComp] };
+  }
+
+  // Min-heap for Dijkstra (binary heap of [dist, node]).
+  function heapPush(h, x) {
+    h.push(x); let i = h.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (h[p][0] <= h[i][0]) break;
+      const t = h[p]; h[p] = h[i]; h[i] = t; i = p;
+    }
+  }
+  function heapPop(h) {
+    const r = h[0]; const last = h.pop();
+    if (h.length) {
+      h[0] = last; let i = 0; const n = h.length;
+      while (true) {
+        const l = 2*i+1, r2 = 2*i+2; let m = i;
+        if (l < n && h[l][0] < h[m][0]) m = l;
+        if (r2 < n && h[r2][0] < h[m][0]) m = r2;
+        if (m === i) break;
+        const t = h[m]; h[m] = h[i]; h[i] = t; i = m;
+      }
+    }
+    return r;
+  }
+
+  // Step 2b — geodesic D_g restricted to the largest connected component.
+  // Returns the embedding-relevant indices (within the original T) and
+  // the dense T_main x T_main geodesic matrix.
+  function geodesicDistances(D, T, k) {
+    const adj = kNNGraph(D, T, k);
+    const cc = connectedComponents(adj, T);
+    const indices = [];
+    for (let i = 0; i < T; i++) if (cc.comp[i] === cc.mainComp) indices.push(i);
+    const Tm = indices.length;
+    const remap = new Int32Array(T).fill(-1);
+    for (let i = 0; i < Tm; i++) remap[indices[i]] = i;
+
+    const Dg = new Float32Array(Tm * Tm);
+    const dist = new Float64Array(T);
+    for (let s = 0; s < Tm; s++) {
+      const src = indices[s];
+      dist.fill(Infinity); dist[src] = 0;
+      const h = []; heapPush(h, [0, src]);
+      while (h.length) {
+        const [d, u] = heapPop(h);
+        if (d > dist[u]) continue;
+        for (const e of adj[u]) {
+          const nd = d + e.w;
+          if (nd < dist[e.j]) { dist[e.j] = nd; heapPush(h, [nd, e.j]); }
+        }
+      }
+      for (let i = 0; i < Tm; i++) Dg[s * Tm + i] = dist[indices[i]];
+    }
+    return { Dg, indices, components: cc.components, mainSize: cc.mainSize };
+  }
+
+  // Step 3 — classical MDS via power iteration with deflation, top-3.
+  function classicalMDS3(Dg, T) {
+    if (T < 4) return { Y: new Float32Array(T * 3), eig: [0,0,0], totalVar: 0 };
+    // Build B = -1/2 * J * D^2 * J
+    const B = new Float64Array(T * T);
+    const row = new Float64Array(T);
+    let total = 0;
+    for (let i = 0; i < T; i++) {
+      let s = 0;
+      for (let j = 0; j < T; j++) {
+        const d = Dg[i*T + j]; const d2 = d * d;
+        B[i*T + j] = d2; s += d2;
+      }
+      row[i] = s / T; total += s;
+    }
+    const grand = total / (T * T);
+    for (let i = 0; i < T; i++) {
+      const ri = row[i];
+      for (let j = 0; j < T; j++) {
+        B[i*T + j] = -0.5 * (B[i*T + j] - ri - row[j] + grand);
+      }
+    }
+    // Trace of B = sum of eigenvalues (variance budget).
+    let trace = 0;
+    for (let i = 0; i < T; i++) trace += B[i*T + i];
+
+    const eigs = [], vecs = [];
+    const tmp = new Float64Array(T);
+    for (let m = 0; m < 3; m++) {
+      const v = new Float64Array(T);
+      for (let i = 0; i < T; i++) v[i] = Math.random() - 0.5;
+      let norm = 0; for (let i = 0; i < T; i++) norm += v[i]*v[i];
+      norm = Math.sqrt(norm) || 1;
+      for (let i = 0; i < T; i++) v[i] /= norm;
+
+      let lambda = 0;
+      for (let it = 0; it < 200; it++) {
+        // tmp = B v
+        for (let i = 0; i < T; i++) {
+          let s = 0;
+          for (let j = 0; j < T; j++) s += B[i*T + j] * v[j];
+          tmp[i] = s;
+        }
+        let n2 = 0; for (let i = 0; i < T; i++) n2 += tmp[i]*tmp[i];
+        const n = Math.sqrt(n2);
+        if (n === 0) { lambda = 0; break; }
+        let dot = 0;
+        for (let i = 0; i < T; i++) {
+          tmp[i] /= n;
+          dot += tmp[i] * v[i];
+        }
+        for (let i = 0; i < T; i++) v[i] = tmp[i];
+        // sign of lambda from Rayleigh; magnitude from norm
+        // converged when v aligns with previous iterate
+        if (Math.abs(Math.abs(dot) - 1) < 1e-7) break;
+      }
+      // Rayleigh quotient
+      let num = 0;
+      for (let i = 0; i < T; i++) {
+        let s = 0;
+        for (let j = 0; j < T; j++) s += B[i*T + j] * v[j];
+        num += v[i] * s;
+      }
+      lambda = num;
+      eigs.push(lambda); vecs.push(v);
+      // Deflate: B := B - lambda * v v^T
+      for (let i = 0; i < T; i++) {
+        const lvi = lambda * v[i];
+        for (let j = 0; j < T; j++) B[i*T + j] -= lvi * v[j];
+      }
+    }
+
+    const Y = new Float32Array(T * 3);
+    for (let kk = 0; kk < 3; kk++) {
+      const sq = Math.sqrt(Math.max(0, eigs[kk]));
+      for (let i = 0; i < T; i++) Y[i*3 + kk] = sq * vecs[kk][i];
+    }
+    return { Y, eig: eigs, totalVar: Math.max(trace, 1e-9) };
+  }
+
+  // ── Drawing: raster ────────────────────────────────────────────────────
+  // Render the binary raster as an N-row × T-col image, scaled to the canvas.
+  function drawRaster(raster, N, T) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, rasterCv.offsetWidth), H = Math.max(1, rasterCv.offsetHeight);
+    rasterCv.width = W * dpr; rasterCv.height = H * dpr;
+    const ctx = rasterCv.getContext('2d'); ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#090909'; ctx.fillRect(0, 0, W, H);
+    if (!raster) return;
+
+    // Build a T x N image where x = time, y = neuron id.
+    const img = ctx.createImageData(T, N);
+    for (let t = 0; t < T; t++) {
+      for (let i = 0; i < N; i++) {
+        const on = raster[t*N + i];
+        const px = (i * T + t) * 4;
+        if (on) { img.data[px]=252; img.data[px+1]=255; img.data[px+2]=164; img.data[px+3]=255; }
+        else    { img.data[px]= 86; img.data[px+1]= 23; img.data[px+2]=107; img.data[px+3]=120; }
+      }
+    }
+    // Render via an offscreen canvas so we can scale up to (W,H) cleanly.
+    const off = document.createElement('canvas');
+    off.width = T; off.height = N;
+    off.getContext('2d').putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, W, H);
+  }
+
+  // ── Drawing: 3D scatter ────────────────────────────────────────────────
+  let rotX = -0.4, rotY = 0.6;
+  let lastEmbed = null;     // { Y, T, eig, indices, totalVar, ... }
+
+  function drawEmbedding() {
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, embedCv.offsetWidth), H = Math.max(1, embedCv.offsetHeight);
+    embedCv.width = W * dpr; embedCv.height = H * dpr;
+    const ctx = embedCv.getContext('2d'); ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#090909'; ctx.fillRect(0, 0, W, H);
+
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted') || '#666';
+    if (!lastEmbed) {
+      ctx.fillStyle = muted; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('press "Sample & embed" to compute Isomap', W/2, H/2);
+      return;
+    }
+    const { Y, T, indices, fullT } = lastEmbed;
+    if (T < 4) {
+      ctx.fillStyle = muted; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('embedding degenerate (too few points in main component)', W/2, H/2);
+      return;
+    }
+
+    // Auto-scale: project then fit to viewport with margin.
+    const sx = Math.sin(rotY), cx = Math.cos(rotY);
+    const sy = Math.sin(rotX), cy = Math.cos(rotX);
+    const proj = new Float32Array(T * 3);   // (u, v, depth)
+    let umin=Infinity,umax=-Infinity,vmin=Infinity,vmax=-Infinity;
+    for (let i = 0; i < T; i++) {
+      const x = Y[i*3], y = Y[i*3+1], z = Y[i*3+2];
+      const x1 = cx*x + sx*z;
+      const z1 = -sx*x + cx*z;
+      const y1 = cy*y - sy*z1;
+      const z2 = sy*y + cy*z1;
+      proj[i*3] = x1; proj[i*3+1] = y1; proj[i*3+2] = z2;
+      if (x1<umin) umin=x1; if (x1>umax) umax=x1;
+      if (y1<vmin) vmin=y1; if (y1>vmax) vmax=y1;
+    }
+    const margin = 18;
+    const usp = umax - umin || 1, vsp = vmax - vmin || 1;
+    const scale = Math.min((W - 2*margin) / usp, (H - 2*margin) / vsp);
+    const cxp = W/2 - 0.5*(umin + umax)*scale;
+    const cyp = H/2 + 0.5*(vmin + vmax)*scale;
+    const r = Math.max(1.4, Math.min(3.5, 60 / Math.sqrt(T)));
+
+    // Painter's algorithm: sort by depth (back to front).
+    const order = new Int32Array(T);
+    for (let i = 0; i < T; i++) order[i] = i;
+    order.sort((a, b) => proj[a*3+2] - proj[b*3+2]);
+
+    const denom = Math.max((fullT || T) - 1, 1);
+    for (let m = 0; m < T; m++) {
+      const i = order[m];
+      const u = cxp + proj[i*3]*scale;
+      const v = cyp - proj[i*3+1]*scale;
+      const tIdx = indices ? indices[i] : i;
+      ctx.fillStyle = heatColor(tIdx / denom);
+      ctx.beginPath(); ctx.arc(u, v, r, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Axis hint (tiny label bottom-left)
+    ctx.fillStyle = muted; ctx.font = '9px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('color = time (early → late)', 6, H - 6);
+  }
+
+  embedCv.addEventListener('pointerdown', (e) => {
+    embedCv.setPointerCapture(e.pointerId);
+    let lastX = e.clientX, lastY = e.clientY;
+    const move = (ev) => {
+      rotY += (ev.clientX - lastX) * 0.01;
+      rotX += (ev.clientY - lastY) * 0.01;
+      lastX = ev.clientX; lastY = ev.clientY;
+      drawEmbedding();
+    };
+    const up = () => {
+      embedCv.removeEventListener('pointermove', move);
+      embedCv.removeEventListener('pointerup', up);
+    };
+    embedCv.addEventListener('pointermove', move);
+    embedCv.addEventListener('pointerup', up);
+  });
+
+  // ── Driver ─────────────────────────────────────────────────────────────
+  function setRegimeButton(regime) {
+    regimeBtns.forEach(b => b.classList.toggle('active', b.dataset.regime === regime));
+  }
+  function syncRegimeFromSigma() {
+    const s = +sigmaSl.value;
+    let key = null;
+    for (const k in REGIME_SIGMA) if (REGIME_SIGMA[k] === s) { key = k; break; }
+    regimeBtns.forEach(b => b.classList.toggle('active', b.dataset.regime === key));
+  }
+
+  function showComputing(msg) {
+    const ctx = embedCv.getContext('2d');
+    const W = embedCv.offsetWidth, H = embedCv.offsetHeight;
+    ctx.fillStyle = 'rgba(9,9,9,0.78)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--node-on');
+    ctx.font = '11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(msg, W/2, H/2);
+  }
+
+  function runOnce() {
+    syncLabels();
+    const { sigma, N, T, k } = readParams();
+    runBtn.disabled = true;
+    showComputing('sampling reservoir…');
+
+    // Defer the heavy work so the "computing…" overlay can paint.
+    setTimeout(() => {
+      try {
+        const sample = sampleActiveStates(N, T, sigma);
+        const Tact = sample.T;
+        drawRaster(sample.raster, N, Tact);
+
+        document.getElementById('mf-stat-coll').textContent =
+          Tact === T ? `${Tact}` : `${Tact} / ${T} (cap)`;
+        document.getElementById('mf-stat-cas').textContent =
+          `${sample.cascades} / ${sample.totalSteps}`;
+
+        if (Tact < 4) {
+          // Not enough diversity to even attempt MDS.
+          lastEmbed = null;
+          drawEmbedding();
+          document.getElementById('mf-stat-sigma').textContent = sigma.toFixed(2);
+          document.getElementById('mf-stat-act').textContent   = '—';
+          document.getElementById('mf-stat-eig').textContent   = '—';
+          document.getElementById('mf-stat-var').textContent   = '—';
+          document.getElementById('mf-stat-conn').textContent  = 'too few active states';
+          document.getElementById('mf-stat-regime').textContent =
+            sigma < 0.95 ? 'subcritical' : (sigma > 1.05 ? 'supercritical' : 'near-critical');
+          runBtn.disabled = false;
+          return;
+        }
+
+        showComputing('computing geodesics…');
+        setTimeout(() => {
+          try {
+            const D   = pairwiseHamming(sample.raster, Tact, N);
+            const geo = geodesicDistances(D, Tact, k);
+            const Tm  = geo.indices.length;
+            const mds = classicalMDS3(geo.Dg, Tm);
+
+            let on = 0;
+            for (let i = 0; i < sample.raster.length; i++) on += sample.raster[i];
+            const act = on / (sample.raster.length || 1);
+
+            lastEmbed = {
+              Y: mds.Y, T: Tm, eig: mds.eig, totalVar: mds.totalVar,
+              indices: geo.indices, components: geo.components, mainSize: geo.mainSize,
+              fullT: Tact,
+            };
+            drawEmbedding();
+
+            const eigSum3 = Math.max(0, mds.eig[0]) + Math.max(0, mds.eig[1]) + Math.max(0, mds.eig[2]);
+            const varRatio = eigSum3 / Math.max(mds.totalVar, 1e-9);
+
+            document.getElementById('mf-stat-sigma').textContent = sigma.toFixed(2);
+            document.getElementById('mf-stat-act').textContent   = act.toFixed(3);
+            document.getElementById('mf-stat-eig').textContent   =
+              mds.eig.map(v => v >= 0.01 ? v.toFixed(2) : v.toExponential(1)).join(', ');
+            document.getElementById('mf-stat-var').textContent   =
+              isFinite(varRatio) ? (100*varRatio).toFixed(1) + '%' : '—';
+            document.getElementById('mf-stat-conn').textContent  =
+              geo.components <= 1
+                ? `yes (${Tm} pts)`
+                : `no (${geo.components} comps · main = ${geo.mainSize}/${Tact})`;
+            document.getElementById('mf-stat-regime').textContent =
+              sigma < 0.95 ? 'subcritical' : (sigma > 1.05 ? 'supercritical' : 'near-critical');
+          } finally {
+            runBtn.disabled = false;
+          }
+        }, 16);
+      } catch (err) {
+        runBtn.disabled = false;
+        console.error(err);
+        showComputing('error: ' + (err.message || err));
+      }
+    }, 16);
+  }
+
+  // ── Events ─────────────────────────────────────────────────────────────
+  [sigmaSl, nSl, tSl, kSl].forEach(sl => sl.addEventListener('input', () => {
+    syncLabels();
+    if (sl === sigmaSl) syncRegimeFromSigma();
+  }));
+  regimeBtns.forEach(btn => btn.addEventListener('click', () => {
+    sigmaSl.value = REGIME_SIGMA[btn.dataset.regime];
+    setRegimeButton(btn.dataset.regime);
+    syncLabels();
+    runOnce();
+  }));
+  runBtn.addEventListener('click', runOnce);
+
+  // initial render + auto-run with the default (near-critical) preset
+  drawRaster(null, +nSl.value, +tSl.value);
+  drawEmbedding();
+  syncRegimeFromSigma();
+  setTimeout(runOnce, 50);
+});
+</script>
+</body>
+</html>
