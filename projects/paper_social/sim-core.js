@@ -223,7 +223,6 @@
       this.state = new Uint8Array(this.n);
       this.next = new Uint8Array(this.n);
       this.history = [];
-      this.reseedFlash = 0;
       this.seedRandom();
     }
 
@@ -235,7 +234,6 @@
       this.state.fill(0);
       this.state[Math.floor(Math.random() * this.n)] = 1;
       this.history = [this.state.slice()];
-      this.reseedFlash = 0;
     }
 
     step(steps = 1) {
@@ -243,7 +241,6 @@
         const wasDead = countActiveRange(this.state, 0, this.n) === 0;
         if (wasDead) {
           this.state[Math.floor(Math.random() * this.n)] = 1;
-          this.reseedFlash = 6;
         }
         reservoirStepRange(this.state, this.next, 0, this.n, this.pMicro());
         this.state.set(this.next);
@@ -277,7 +274,6 @@
       const fixedLightR = opts?.fixedLightR;
       const macroBlend = opts?.macroBlend;
       const pal = macroBlend != null ? paletteAt(macroBlend) : PALETTE;
-      const showRing = opts?.showRing !== false && detail > 0.35;
       const glowLight = opts?.glowLight !== false && !fixedLightR;
       const heading = opts?.heading ?? this.heading;
       const nodes = buildReservoirNodes(cx, cy, radius, this.n, this.nSensors, heading);
@@ -289,14 +285,6 @@
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, detail));
-
-      if (showRing) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius * 0.92, 0, Math.PI * 2);
-        ctx.strokeStyle = pal.ring;
-        ctx.lineWidth = Math.max(1, radius * 0.025);
-        ctx.stroke();
-      }
 
       ctx.strokeStyle = pal.edge;
       ctx.lineWidth = Math.max(0.4, radius * 0.012);
@@ -342,14 +330,13 @@
         ctx.shadowBlur = 0;
       }
 
-      if (this.reseedFlash > 0) {
-        const a = this.reseedFlash / 6;
-        ctx.strokeStyle = `rgba(231,116,36,${a.toFixed(3)})`;
+      if (detail > 0.35) {
+        const on = this.lightOn();
+        ctx.strokeStyle = on ? PALETTE.on : MACRO_OFF;
         ctx.lineWidth = Math.max(1.5, radius * 0.04);
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.98, 0, Math.PI * 2);
         ctx.stroke();
-        this.reseedFlash--;
       }
 
       ctx.restore();
