@@ -21,6 +21,26 @@
     <button id="frame-next" type="button" title="Next frame (→)">+1</button>
   </div>
   <div id="debug-scene-next">—</div>
+  <div id="debug-macro-tune" class="hidden">
+    <div class="debug-macro-tune-row">
+      <span class="debug-macro-tune-label">Micro σ</span>
+      <input id="macro-sigma-slider" type="range" min="40" max="160" value="108" step="1" aria-label="Micro branching ratio sigma" />
+      <span id="macro-sigma-val" class="debug-macro-tune-val">1.08</span>
+    </div>
+    <div class="debug-macro-tune-row">
+      <span class="debug-macro-tune-label">Vision v_r</span>
+      <input id="macro-vd-slider" type="range" min="5" max="120" value="55" step="5" aria-label="Vision radius" />
+      <span id="macro-vd-val" class="debug-macro-tune-val">55</span>
+    </div>
+    <div class="debug-macro-tune-row">
+      <span class="debug-macro-tune-label">Layout seed</span>
+      <button id="macro-seed-prev" type="button" class="macro-seed-step" title="Previous seed">−</button>
+      <input id="macro-seed-slider" type="range" min="0" max="4095" value="42" step="1" aria-label="Agent layout seed" />
+      <button id="macro-seed-next" type="button" class="macro-seed-step" title="Next seed">+</button>
+      <span id="macro-seed-val" class="debug-macro-tune-val">42</span>
+    </div>
+    <div class="debug-macro-tune-hint">Scene 5 only · σ ≈ 1 for critical cascades</div>
+  </div>
   <div id="debug-scene-jumps"></div>
 </div>
 <div id="control-btns">
@@ -33,7 +53,7 @@
 <script src="scenes.js"></script>
 <script>
 const { MicroReservoir, fitCanvas, PALETTE, macroBlendAt, drawBidirectionalCoupling } = PaperSocial;
-const { MacroPopulation, MACRO_POP_SEED, MACRO_VD, MACRO_P } = PaperSocialMacro;
+const { MacroPopulation, MACRO_POP_SEED, MACRO_VD, MACRO_SIGMA, MACRO_P } = PaperSocialMacro;
 const { sceneAt, SCENES, sceneStarts, easeInOutCubic, totalAnimatedDuration } = SceneLexicon;
 
 const RECORD_FPS = 30;
@@ -69,8 +89,60 @@ const debugSlider = document.getElementById("debug-scene-slider");
 const framePrevBtn = document.getElementById("frame-prev");
 const frameNextBtn = document.getElementById("frame-next");
 const debugJumps = document.getElementById("debug-scene-jumps");
+const macroTunePanel = document.getElementById("debug-macro-tune");
+const macroSigmaSlider = document.getElementById("macro-sigma-slider");
+const macroSigmaVal = document.getElementById("macro-sigma-val");
+const macroVdSlider = document.getElementById("macro-vd-slider");
+const macroVdVal = document.getElementById("macro-vd-val");
+const macroSeedSlider = document.getElementById("macro-seed-slider");
+const macroSeedVal = document.getElementById("macro-seed-val");
+const macroSeedPrev = document.getElementById("macro-seed-prev");
+const macroSeedNext = document.getElementById("macro-seed-next");
 
 if (!SHOW_DEBUG) debugPanel.classList.add("hidden");
+else macroTunePanel.classList.add("hidden");
+
+function syncMacroTuneReadouts() {
+  const sigma = macroPop.microSigma();
+  macroSigmaSlider.value = String(Math.round(sigma * 100));
+  macroSigmaVal.textContent = sigma.toFixed(2);
+  macroVdSlider.value = String(macroPop.vd);
+  macroVdVal.textContent = String(macroPop.vd);
+  macroSeedSlider.value = String(macroPop.seed >>> 0);
+  macroSeedVal.textContent = String(macroPop.seed >>> 0);
+}
+
+function applyMacroSigmaFromSlider() {
+  const sigma = parseInt(macroSigmaSlider.value, 10) / 100;
+  macroPop.setMicroSigma(sigma);
+  macroSigmaVal.textContent = sigma.toFixed(2);
+}
+
+function applyMacroVdFromSlider() {
+  const vd = parseInt(macroVdSlider.value, 10);
+  macroPop.setVisionRadius(vd);
+  macroVdVal.textContent = String(vd);
+}
+
+function applyMacroSeed(seed) {
+  const clamped = Math.min(4095, Math.max(0, seed >>> 0));
+  macroPop.setSeed(clamped);
+  macroSeedSlider.value = String(clamped);
+  macroSeedVal.textContent = String(clamped);
+}
+
+function applyMacroSeedFromSlider() {
+  applyMacroSeed(parseInt(macroSeedSlider.value, 10));
+}
+
+if (SHOW_DEBUG) {
+  macroSigmaSlider.addEventListener("input", applyMacroSigmaFromSlider);
+  macroVdSlider.addEventListener("input", applyMacroVdFromSlider);
+  macroSeedSlider.addEventListener("input", applyMacroSeedFromSlider);
+  macroSeedPrev.addEventListener("click", () => applyMacroSeed(macroPop.seed - 1));
+  macroSeedNext.addEventListener("click", () => applyMacroSeed(macroPop.seed + 1));
+  syncMacroTuneReadouts();
+}
 
 const sceneJumpBtns = SCENES.map((scene, i) => {
   const btn = document.createElement("button");
@@ -163,7 +235,10 @@ function resetAnimation() {
   jumpToScene(0);
   res.seedRandom();
   resB.seedRandom();
-  macroPop.initSeeded();
+  macroPop.setSeed(MACRO_POP_SEED);
+  macroPop.setVisionRadius(MACRO_VD);
+  macroPop.setMicroSigma(MACRO_SIGMA);
+  if (SHOW_DEBUG) syncMacroTuneReadouts();
 }
 
 function togglePause() {
@@ -424,6 +499,25 @@ function drawSceneDualZoomOut(L, u, w, h) {
   }
 }
 
+function drawFullMacroField(w, h) {
+  macroPop.ensureCenterAnchors(w, h, MACRO_ZOOM_END);
+  const fullOrig = macroPop.fullFieldOrigin(w, h, MACRO_ZOOM_END);
+  const fullTransform = macroPop.buildTransform(w, h, { origin: fullOrig });
+  macroPop.draw(ctx, w, h, {
+    reveal: 1,
+    revealMul: 1,
+    uniformReveal: true,
+    transform: fullTransform,
+    agentR: fullTransform.r,
+    edgeAlpha: 1,
+    edgeRipple: false,
+  });
+}
+
+function drawSceneMacro(_L, _u, w, h) {
+  drawFullMacroField(w, h);
+}
+
 function updateDebugPanel(st) {
   if (!SHOW_DEBUG) return;
   const { scene, tInScene, u, index, tGlobal } = st;
@@ -445,6 +539,11 @@ function updateDebugPanel(st) {
   sceneJumpBtns.forEach((btn, i) => {
     btn.classList.toggle("active", i === index);
   });
+  if (macroTunePanel) {
+    const showTune = scene.key === "macro";
+    macroTunePanel.classList.toggle("hidden", !showTune);
+    if (showTune) syncMacroTuneReadouts();
+  }
 }
 
 function draw() {
@@ -467,6 +566,8 @@ function draw() {
     drawScenePair(L, st.animU, w, h);
   } else if (st.scene.key === "dualZoomOut") {
     drawSceneDualZoomOut(L, st.u, w, h);
+  } else if (st.scene.key === "macro") {
+    drawSceneMacro(L, st.u, w, h);
   }
 
   ctx.strokeStyle = "rgba(252,255,164,0.45)";
@@ -477,14 +578,19 @@ function draw() {
 }
 
 function loop() {
+  const tSec = getTSec();
+  const st = sceneAt(tSec);
+
   if (!paused) {
     res.step(2);
     resB.step(2);
-    if (getMacroGraphU(getTSec()) > 0) {
+    if (st.scene.key === "macro") {
+      for (let i = 0; i < 4; i++) macroPop.macroStep();
+    } else if (getMacroGraphU(tSec) > 0) {
       macroPop.macroStep();
       macroPop.macroStep();
     }
-    tPaused = getTSec();
+    tPaused = tSec;
   }
   draw();
   requestAnimationFrame(loop);

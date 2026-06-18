@@ -31,6 +31,13 @@
       description: "Pair collapses; micro dots zoom out alone to macro scale, then the field fades in",
       duration: 6.0,
     },
+    {
+      key: "macro",
+      id: 5,
+      title: "Scene 5 · Macro",
+      description: "Full macro field continues — critical cascades",
+      duration: 5.0,
+    },
   ];
 
   function sceneStarts() {
@@ -70,6 +77,8 @@
     } else if (scene.key === "pair") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     } else if (scene.key === "dualZoomOut") {
+      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
+    } else if (scene.key === "macro") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     }
 

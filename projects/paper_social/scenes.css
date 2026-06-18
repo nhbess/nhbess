@@ -15,9 +15,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 20px;
-  padding: 20px;
+  padding: 48px 20px 32px;
+  min-height: 100%;
   overflow: auto;
 }
 
@@ -133,6 +134,79 @@ body {
   color: #090909;
   background: #fcffa4;
   border-color: #fcffa4;
+}
+
+#debug-macro-tune {
+  margin: 4px auto 18px;
+  max-width: 560px;
+}
+
+#debug-macro-tune.hidden {
+  display: none;
+}
+
+.debug-macro-tune-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.debug-macro-tune-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.debug-macro-tune-label {
+  flex: 0 0 auto;
+  font-family: monospace;
+  font-size: 0.95rem;
+  color: #ccc;
+  min-width: 5.5em;
+  text-align: right;
+}
+
+.debug-macro-tune-val {
+  flex: 0 0 auto;
+  font-family: monospace;
+  font-size: 0.95rem;
+  color: #fcffa4;
+  min-width: 2.8em;
+  text-align: center;
+}
+
+#macro-sigma-slider,
+#macro-vd-slider,
+#macro-seed-slider {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  accent-color: #fcffa4;
+  cursor: pointer;
+}
+
+.macro-seed-step {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-family: monospace;
+  font-size: 0.95rem;
+  color: #fcffa4;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.macro-seed-step:hover {
+  border-color: rgba(252, 255, 164, 0.45);
+  background: #222;
+}
+
+.debug-macro-tune-hint {
+  margin-top: 10px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #666;
 }
 
 #stage {

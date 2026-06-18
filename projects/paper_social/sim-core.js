@@ -625,11 +625,31 @@
     return cachedFrame;
   }
 
+  /** Reserve space for page chrome below/around the canvas (debug panel, padding). */
+  function pageChromeHeight() {
+    const body = document.body;
+    if (!body) return 0;
+    const style = getComputedStyle(body);
+    const padT = parseFloat(style.paddingTop) || 0;
+    const padB = parseFloat(style.paddingBottom) || 0;
+    const gap = parseFloat(style.gap) || 0;
+    let h = padT + padB + 12;
+    const debug = document.getElementById("debug-panel");
+    if (debug && !debug.classList.contains("hidden")) {
+      h += gap + debug.offsetHeight;
+    }
+    return h;
+  }
+
   /** Fixed export frame scaled to fit the browser window. */
   function fitCanvas(canvas, ctx) {
     const { w: frameW, h: frameH } = getFrameSize();
     const dpr = window.devicePixelRatio || 1;
-    const scale = Math.min(window.innerWidth / frameW, window.innerHeight / frameH);
+    const bodyStyle = getComputedStyle(document.body);
+    const padX = (parseFloat(bodyStyle.paddingLeft) || 0) + (parseFloat(bodyStyle.paddingRight) || 0);
+    const availW = window.innerWidth - padX - 8;
+    const availH = window.innerHeight - pageChromeHeight();
+    const scale = Math.min(availW / frameW, availH / frameH);
     const cssW = Math.max(1, Math.floor(frameW * scale));
     const cssH = Math.max(1, Math.floor(frameH * scale));
     canvas.width = Math.floor(frameW * dpr);

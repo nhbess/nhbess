@@ -10,6 +10,11 @@
   const KE = 8;
   const MICRO = 5;
 
+  const MACRO_POP_SEED = 42;
+  const MACRO_VD = 55;
+  const MACRO_SIGMA = 1.08;
+  const MACRO_P = MACRO_SIGMA / (N_NEURONS - 1);
+
   const PAL = {
     bg: "#090909",
     off: "#56176b",
@@ -21,7 +26,7 @@
     constructor(opts) {
       this.seed = opts?.seed ?? 42;
       this.vd = opts?.vd ?? 56;
-      this.pMicro = opts?.pMicro ?? 0.015873;
+      this.pMicro = opts?.pMicro ?? MACRO_P;
       this.pos = new Float32Array(N_AGENTS * 2);
       this.ang = new Float32Array(N_AGENTS);
       this.lights = new Uint8Array(N_AGENTS);
@@ -124,6 +129,32 @@
       for (let k = 1; k <= N_NEURONS; k++) {
         this.pow1mP[k] = this.pow1mP[k - 1] * q;
       }
+    }
+
+    /** Branching ratio σ = (N_neurons − 1) · p_micro (Scene 5 tuning). */
+    setMicroSigma(sigma) {
+      this.pMicro = sigma / Math.max(N_NEURONS - 1, 1);
+      this.buildPowers();
+    }
+
+    microSigma() {
+      return this.pMicro * (N_NEURONS - 1);
+    }
+
+    /** Re-roll agent positions/headings; keeps σ and v_r. */
+    setSeed(seed) {
+      this.seed = seed >>> 0;
+      this.initSeeded();
+    }
+
+    /** Vision radius v_r — rebuilds coupling graph, keeps layout and σ. */
+    setVisionRadius(vd) {
+      this.vd = Math.max(1, Math.round(vd));
+      this._anchorW = 0;
+      this._anchorH = 0;
+      this._anchorZoom = 0;
+      this.rebuildAdj();
+      this.computeObs();
     }
 
     rebuildAdj() {
@@ -259,6 +290,7 @@
       }
 
       const r = Math.max(1.2, R_AGENT * scale);
+      const clip = opts?.clip ?? { x: w * padFrac, y: h * padFrac, w: drawW, h: drawH };
       return {
         tx: (x) => ox + x * scale,
         ty: (y) => oy + y * scale,
@@ -266,7 +298,7 @@
         scale,
         scaleBase,
         vdPx: this.vd * scale,
-        clip: { x: w * padFrac, y: h * padFrac, w: drawW, h: drawH },
+        clip,
       };
     }
 
@@ -451,9 +483,11 @@
     MAP_H,
     R_AGENT,
     N_AGENTS,
+    N_NEURONS,
     MacroPopulation,
-    MACRO_POP_SEED: 42,
-    MACRO_VD: 56,
-    MACRO_P: 0.015873,
+    MACRO_POP_SEED,
+    MACRO_VD,
+    MACRO_SIGMA,
+    MACRO_P,
   };
 })(window);
