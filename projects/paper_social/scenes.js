@@ -45,6 +45,13 @@
       description: "Field moves to top band (like Scene 1); population raster fills the bottom band",
       duration: 4.0,
     },
+    {
+      key: "finale",
+      id: 7,
+      title: "Scene 7 · Finale",
+      description: "Raster fades; full macro field returns; gentle fade to black",
+      duration: 5.0,
+    },
   ];
 
   function sceneStarts() {
@@ -88,6 +95,8 @@
     } else if (scene.key === "macro") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     } else if (scene.key === "macroRaster") {
+      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
+    } else if (scene.key === "finale") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     }
 
