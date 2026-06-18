@@ -52,7 +52,7 @@
 <script src="macro-pop.js"></script>
 <script src="scenes.js"></script>
 <script>
-const { MicroReservoir, fitCanvas, PALETTE, macroBlendAt, drawBidirectionalCoupling } = PaperSocial;
+const { MicroReservoir, fitCanvas, getFrameSize, PALETTE, macroBlendAt, drawBidirectionalCoupling } = PaperSocial;
 const { MacroPopulation, MACRO_POP_SEED, MACRO_VD, MACRO_SIGMA, MACRO_P } = PaperSocialMacro;
 const { sceneAt, SCENES, sceneStarts, easeInOutCubic, totalAnimatedDuration } = SceneLexicon;
 
@@ -77,7 +77,9 @@ function smoothstep(x) {
   return t * t * (3 - 2 * t);
 }
 
-const SHOW_DEBUG = new URLSearchParams(location.search).get("debug") !== "0";
+const urlParams = new URLSearchParams(location.search);
+const SHOW_DEBUG = urlParams.get("debug") !== "0";
+const EXPORT_MODE = urlParams.get("export") === "1";
 
 const debugPanel = document.getElementById("debug-panel");
 const debugTitle = document.getElementById("debug-scene-title");
@@ -156,10 +158,12 @@ const sceneJumpBtns = SCENES.map((scene, i) => {
 });
 
 let tStart = performance.now();
-let paused = false;
+let paused = EXPORT_MODE;
 let prevSceneKey = null;
 let tPaused = 0;
 let scrubbing = false;
+
+if (EXPORT_MODE) document.body.classList.add("export-mode");
 
 const stopBtn = document.getElementById("stop-btn");
 
@@ -615,7 +619,7 @@ function macroSimActive(tSec) {
 
 function macroHistoryActive(tSec) {
   const key = sceneAt(tSec).scene.key;
-  return key === "macro" || key === "macroRaster";
+  return key === "macro" || key === "macroRaster" || key === "finale";
 }
 
 function updateDebugPanel(st) {
@@ -646,8 +650,21 @@ function updateDebugPanel(st) {
   }
 }
 
+function fitCanvasForDraw() {
+  if (EXPORT_MODE) {
+    const { w: frameW, h: frameH } = getFrameSize();
+    canvas.width = frameW;
+    canvas.height = frameH;
+    canvas.style.width = frameW + "px";
+    canvas.style.height = frameH + "px";
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    return { w: frameW, h: frameH, dpr: 1 };
+  }
+  return fitCanvas(canvas, ctx);
+}
+
 function draw() {
-  const { w, h } = fitCanvas(canvas, ctx);
+  const { w, h } = fitCanvasForDraw();
   canvas._fw = w;
   canvas._fh = h;
 
@@ -684,8 +701,7 @@ function draw() {
   updateDebugPanel(st);
 }
 
-function loop() {
-  const tSec = getTSec();
+function tickSimulation(tSec) {
   const st = sceneAt(tSec);
 
   if (st.scene.key === "macro" && prevSceneKey !== "macro" && prevSceneKey !== "macroRaster") {
@@ -698,22 +714,75 @@ function loop() {
   macroPop._recordHistory = macroHistoryActive(tSec);
   prevSceneKey = st.scene.key;
 
+  res.step(2);
+  resB.step(2);
+  if (macroSimActive(tSec)) {
+    for (let i = 0; i < 4; i++) macroPop.macroStep();
+  } else if (getMacroGraphU(tSec) > 0) {
+    macroPop.macroStep();
+    macroPop.macroStep();
+  }
+}
+
+function resetForExport() {
+  tPaused = 0;
+  tStart = performance.now();
+  prevSceneKey = null;
+  paused = true;
+  res.seedRandom();
+  resB.seedRandom();
+  macroPop.setSeed(MACRO_POP_SEED);
+  macroPop.setVisionRadius(MACRO_VD);
+  macroPop.setMicroSigma(MACRO_SIGMA);
+  macroPop.clearPopHistory();
+}
+
+function loop() {
+  const tSec = getTSec();
   if (!paused) {
-    res.step(2);
-    resB.step(2);
-    if (macroSimActive(tSec)) {
-      for (let i = 0; i < 4; i++) macroPop.macroStep();
-    } else if (getMacroGraphU(tSec) > 0) {
-      macroPop.macroStep();
-      macroPop.macroStep();
-    }
+    tickSimulation(tSec);
     tPaused = tSec;
   }
   draw();
   requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+if (EXPORT_MODE) {
+  function bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(binary);
+  }
+
+  window.PaperSocialExport = {
+    ready: true,
+    fps: RECORD_FPS,
+    frameCount: timelineFrameCount(),
+    width: getFrameSize().w,
+    height: getFrameSize().h,
+    resetForExport,
+    tickSimulation,
+    draw,
+    /** Frame-by-frame export: draw each frame, JPEG → ffmpeg pipe. */
+    async run(saveFrame) {
+      resetForExport();
+      const total = timelineFrameCount();
+      for (let f = 0; f < total; f++) {
+        tPaused = Math.min(totalAnimatedDuration(), f / RECORD_FPS);
+        tickSimulation(tPaused);
+        draw();
+        const blob = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.95));
+        await saveFrame(f, bufferToBase64(await blob.arrayBuffer()));
+      }
+    },
+  };
+} else {
+  requestAnimationFrame(loop);
+}
 </script>
 </body>
 </html>

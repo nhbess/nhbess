@@ -1,0 +1,13 @@
+{
+  "name": "paper_social",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "video": "node record.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "puppeteer": "^24.2.0"
+  }
+}
+
