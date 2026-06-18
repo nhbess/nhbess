@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Micro reservoir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="scenes.css">
 </head>
 <body>
@@ -57,6 +60,41 @@ const { MacroPopulation, MACRO_POP_SEED, MACRO_VD, MACRO_SIGMA, MACRO_P } = Pape
 const { sceneAt, SCENES, sceneStarts, easeInOutCubic, totalAnimatedDuration } = SceneLexicon;
 
 const RECORD_FPS = 30;
+const RASTER_SLIDE_S = 2;
+const FINALE_RASTER_HOLD_S = 2;
+const SHOW_SCENE_CAPTIONS = true;
+const CAPTION_DURATION_S = 4;
+const CAPTION_FADE_S = 0.9;
+const CAPTION_FONT = '"Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif';
+const CAPTION_COLOR_TITLE = "rgba(255,255,255,0.96)";
+const CAPTION_COLOR_SUB = "rgba(255,255,255,0.74)";
+
+const SCENE_CAPTIONS = {
+  micro: {
+    title: "Micro-critical agent",
+    subtitle: "Reservoir-agent with dynamics tuned at near-criticality.",
+  },
+  transition: {
+    title: "Sensors and light",
+    subtitle: "Agents sense and emit light.",
+  },
+  pair: {
+    title: "Coupled agents",
+    subtitle: "Agents interact with each other through light.",
+  },
+  dualZoomOut: {
+    title: "Across scales",
+    subtitle: "At population scale: a network of interacting agents.",
+  },
+  macro: {
+    title: "Activity spreads through the network",
+    subtitle: "One agent’s light can perturb the reservoir dynamics of another.",
+  },
+  macroRaster: {
+    title: "From Micro to Macro",
+    subtitle: "How does micro-level activity shape the dynamics at population-scale?",
+  },
+};
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -79,6 +117,7 @@ function smoothstep(x) {
 
 const urlParams = new URLSearchParams(location.search);
 const SHOW_DEBUG = urlParams.get("debug") !== "0";
+const SHOW_MACRO_TUNE = false;
 const EXPORT_MODE = urlParams.get("export") === "1";
 
 const debugPanel = document.getElementById("debug-panel");
@@ -102,7 +141,7 @@ const macroSeedPrev = document.getElementById("macro-seed-prev");
 const macroSeedNext = document.getElementById("macro-seed-next");
 
 if (!SHOW_DEBUG) debugPanel.classList.add("hidden");
-else macroTunePanel.classList.add("hidden");
+else if (!SHOW_MACRO_TUNE) macroTunePanel.classList.add("hidden");
 
 function syncMacroTuneReadouts() {
   const sigma = macroPop.microSigma();
@@ -227,7 +266,8 @@ function initTimelineScrubber() {
 if (SHOW_DEBUG) initTimelineScrubber();
 
 function getTSec() {
-  return paused ? tPaused : (performance.now() - tStart) * 0.001;
+  const t = paused ? tPaused : (performance.now() - tStart) * 0.001;
+  return Math.min(totalAnimatedDuration(), Math.max(0, t));
 }
 
 function jumpToScene(index) {
@@ -539,7 +579,9 @@ function drawSceneMacro(_L, _u, w, h) {
 }
 
 function drawSceneMacroRaster(L, u, w, h) {
-  const t = easeInOutCubic(u);
+  const sceneDur = SCENES.find((s) => s.key === "macroRaster").duration;
+  const slideU = Math.min(1, u / (RASTER_SLIDE_S / sceneDur));
+  const t = easeInOutCubic(slideU);
   // full field → top band, same t as raster slide-in (mirror Scene 2)
   drawMacroFieldLerp(L, w, h, 1 - t, 1);
   drawRasterSlideIn(L, h, t, 1, () => {
@@ -597,11 +639,14 @@ function drawMacroFieldLerp(L, w, h, tBandToFull, alpha) {
 }
 
 function drawSceneFinale(L, u, w, h) {
-  const t = easeInOutCubic(u);
+  const sceneDur = SCENES.find((s) => s.key === "finale").duration;
+  const holdU = FINALE_RASTER_HOLD_S / sceneDur;
+  const animU = u <= holdU ? 0 : (u - holdU) / (1 - holdU);
+  const t = easeInOutCubic(animU);
   const fadeOut = smoothstep(Math.max(0, (t - 0.58) / 0.42));
   const masterAlpha = 1 - fadeOut;
 
-  // top band → full field + raster slide-out, same t (mirror Scene 2)
+  // hold raster, then top band → full field + raster slide-out (mirror Scene 2)
   drawMacroFieldLerp(L, w, h, t, masterAlpha);
   drawRasterSlideOut(L, h, t, masterAlpha, () => {
     macroPop.drawPopRaster(ctx, L.marginX, L.rasterY, L.rasterW, L.rasterH);
@@ -609,11 +654,16 @@ function drawSceneFinale(L, u, w, h) {
 }
 
 function finaleFadeOut(u) {
-  return smoothstep(Math.max(0, (easeInOutCubic(u) - 0.58) / 0.42));
+  const sceneDur = SCENES.find((s) => s.key === "finale").duration;
+  const holdU = FINALE_RASTER_HOLD_S / sceneDur;
+  const animU = u <= holdU ? 0 : (u - holdU) / (1 - holdU);
+  return smoothstep(Math.max(0, (easeInOutCubic(animU) - 0.58) / 0.42));
 }
 
 function macroSimActive(tSec) {
-  const key = sceneAt(tSec).scene.key;
+  const st = sceneAt(tSec);
+  const key = st.scene.key;
+  if (key === "finale" && st.u >= 1) return false;
   return key === "macro" || key === "macroRaster" || key === "finale";
 }
 
@@ -644,10 +694,166 @@ function updateDebugPanel(st) {
     btn.classList.toggle("active", i === index);
   });
   if (macroTunePanel) {
-    const showTune = scene.key === "macro";
+    const showTune = SHOW_MACRO_TUNE && scene.key === "macro";
     macroTunePanel.classList.toggle("hidden", !showTune);
     if (showTune) syncMacroTuneReadouts();
   }
+}
+
+function sceneCaptionWindow(st) {
+  const sceneDur = st.scene.duration;
+  const duration = Math.min(CAPTION_DURATION_S, sceneDur);
+  let start = Math.max(0, (sceneDur - duration) * 0.5);
+  if (st.scene.key === "transition") start += 1.0;
+  start = Math.min(start, Math.max(0, sceneDur - 0.5));
+  const end = Math.min(sceneDur, start + duration);
+  return { start, end };
+}
+
+function sceneCaptionAlpha(st) {
+  const { start, end } = sceneCaptionWindow(st);
+  const t = st.tInScene;
+  if (t < start || t > end) return 0;
+
+  const span = end - start;
+  const fadeS = Math.min(CAPTION_FADE_S, span * 0.25);
+  const inA = smoothstep(Math.min(1, (t - start) / fadeS));
+  const outA = smoothstep(Math.min(1, (end - t) / fadeS));
+  let alpha = Math.min(inA, outA);
+  if (st.scene.key === "finale") {
+    alpha *= 1 - finaleFadeOut(st.u);
+  }
+  return alpha;
+}
+
+function wrapCaptionLines(ctx, text, maxWidth) {
+  const words = text.split(/\s+/);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function captionFontTitle(size) {
+  return `600 ${size}px ${CAPTION_FONT}`;
+}
+
+function captionFontSub(size) {
+  return `italic 400 ${size}px ${CAPTION_FONT}`;
+}
+
+function measureCaptionBlock(ctx, cap, maxWidth, titleSize, subSize, gap) {
+  ctx.font = captionFontTitle(titleSize);
+  const titleLines = wrapCaptionLines(ctx, cap.title, maxWidth);
+  ctx.font = captionFontSub(subSize);
+  const subLines = cap.subtitle ? wrapCaptionLines(ctx, cap.subtitle, maxWidth) : [];
+  const titleH = titleLines.length * titleSize * 1.2;
+  const subH = subLines.length * subSize * 1.35;
+  const blockH = titleH + (subLines.length ? gap + subH : 0);
+  return { titleLines, subLines, blockH, titleH };
+}
+
+function captionPlacement(w, h, L, st) {
+  const pad = Math.max(18, w * 0.016);
+
+  if (st.scene.key === "micro") {
+    const cx = w * 0.5;
+    const cy = L.netCyStart;
+    const r = L.radiusStart;
+    return {
+      x: cx + r + pad,
+      y: cy,
+      align: "left",
+      valign: "center",
+      maxWidth: Math.max(160, w - (cx + r + pad * 2)),
+    };
+  }
+
+  if (st.scene.key === "transition") {
+    const cx = w * 0.5;
+    const cy = L.netCyEnd;
+    const r = L.radiusEnd;
+    return {
+      x: cx + r + pad,
+      y: cy,
+      align: "left",
+      valign: "center",
+      maxWidth: Math.max(160, w - (cx + r + pad * 2)),
+    };
+  }
+
+  if (st.scene.key === "pair") {
+    const G = pairGeometry(w, h, 1);
+    return {
+      x: (G.cxA + G.cxB) * 0.5,
+      y: Math.max(pad * 2, G.cy - G.radius - pad),
+      align: "center",
+      valign: "bottom",
+      maxWidth: Math.max(220, Math.min(w * 0.72, (G.cxB - G.cxA) + G.radius * 3)),
+    };
+  }
+
+  return {
+    x: w * 0.5,
+    y: h * 0.5,
+    align: "center",
+    valign: "center",
+    maxWidth: w * 0.58,
+  };
+}
+
+function drawSceneCaption(ctx, w, h, L, st) {
+  if (!SHOW_SCENE_CAPTIONS) return;
+  const cap = SCENE_CAPTIONS[st.scene.key];
+  if (!cap) return;
+
+  const alpha = sceneCaptionAlpha(st);
+  if (alpha <= 0.01) return;
+
+  const titleSize = Math.max(36, w * 0.036);
+  const subSize = Math.max(26, w * 0.024);
+  const gap = Math.max(6, h * 0.008);
+  const place = captionPlacement(w, h, L, st);
+  const { titleLines, subLines, blockH } = measureCaptionBlock(
+    ctx, cap, place.maxWidth, titleSize, subSize, gap,
+  );
+
+  let anchorY = place.y;
+  if (place.valign === "center") anchorY = place.y - blockH * 0.5;
+  else if (place.valign === "bottom") anchorY = place.y - blockH;
+
+  ctx.save();
+  ctx.textAlign = place.align;
+  ctx.textBaseline = "top";
+
+  let y = anchorY + titleSize * 0.12;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = CAPTION_COLOR_TITLE;
+  ctx.font = captionFontTitle(titleSize);
+  for (const line of titleLines) {
+    ctx.fillText(line, place.x, y);
+    y += titleSize * 1.22;
+  }
+
+  if (subLines.length) {
+    y += gap * 0.5;
+    ctx.fillStyle = CAPTION_COLOR_SUB;
+    ctx.font = captionFontSub(subSize);
+    for (const line of subLines) {
+      ctx.fillText(line, place.x, y);
+      y += subSize * 1.35;
+    }
+  }
+  ctx.restore();
 }
 
 function fitCanvasForDraw() {
@@ -698,6 +904,7 @@ function draw() {
   ctx.lineWidth = 3;
   ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
 
+  drawSceneCaption(ctx, w, h, L, st);
   updateDebugPanel(st);
 }
 
@@ -740,8 +947,14 @@ function resetForExport() {
 function loop() {
   const tSec = getTSec();
   if (!paused) {
-    tickSimulation(tSec);
-    tPaused = tSec;
+    if (tSec >= totalAnimatedDuration()) {
+      tPaused = totalAnimatedDuration();
+      paused = true;
+      stopBtn.textContent = "Play";
+    } else {
+      tickSimulation(tSec);
+      tPaused = tSec;
+    }
   }
   draw();
   requestAnimationFrame(loop);
@@ -759,7 +972,7 @@ if (EXPORT_MODE) {
   }
 
   window.PaperSocialExport = {
-    ready: true,
+    ready: false,
     fps: RECORD_FPS,
     frameCount: timelineFrameCount(),
     width: getFrameSize().w,
@@ -780,6 +993,9 @@ if (EXPORT_MODE) {
       }
     },
   };
+  document.fonts.ready.then(() => {
+    window.PaperSocialExport.ready = true;
+  });
 } else {
   requestAnimationFrame(loop);
 }

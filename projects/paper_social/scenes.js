@@ -8,7 +8,7 @@
       id: 1,
       title: "Scene 1 · Micro",
       description: "Micro level — full reservoir network + activity raster",
-      duration: 3.0,
+      duration: 4.0,
     },
     {
       key: "transition",
@@ -43,14 +43,14 @@
       id: 6,
       title: "Scene 6 · Macro Raster",
       description: "Field moves to top band (like Scene 1); population raster fills the bottom band",
-      duration: 4.0,
+      duration: 6.0,
     },
     {
       key: "finale",
       id: 7,
       title: "Scene 7 · Finale",
       description: "Raster fades; full macro field returns; gentle fade to black",
-      duration: 5.0,
+      duration: 7.0,
     },
   ];
 
