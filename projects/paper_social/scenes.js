@@ -15,14 +15,16 @@
       id: 2,
       title: "Scene 2 · Transition / Zoom",
       description: "Raster slides away; network moves to center",
-      duration: 4.0,
+      duration: 7.0,
+      animDuration: 4.0,
     },
     {
       key: "pair",
       id: 3,
       title: "Scene 3 · Pair",
       description: "Second reservoir joins; light → sensor observation link",
-      duration: 5.0,
+      duration: 7.0,
+      animDuration: 5.0,
     },
     {
       key: "dualZoomOut",
@@ -36,14 +38,15 @@
       id: 5,
       title: "Scene 5 · Macro",
       description: "Full macro field continues — critical cascades",
-      duration: 5.0,
+      duration: 6.0,
+      animDuration: 5.0,
     },
     {
       key: "macroRaster",
       id: 6,
       title: "Scene 6 · Macro Raster",
       description: "Field moves to top band (like Scene 1); population raster fills the bottom band",
-      duration: 6.0,
+      duration: 8.0,
     },
     {
       key: "finale",
@@ -79,21 +82,21 @@
     const u = scene.duration > 0
       ? Math.min(1, Math.max(0, tInScene / scene.duration))
       : 0;
+    const animDur = scene.animDuration ?? scene.duration;
+    const animT = animDur > 0 ? Math.min(1, Math.max(0, tInScene / animDur)) : 0;
 
     // animU: eased progress for animated scenes (hold scenes use u directly)
     let animU = 0;
     if (scene.key === "micro") {
       animU = 0;
     } else if (scene.key === "transition") {
-      animU = tInScene < scene.duration
-        ? easeInOutCubic(Math.min(1, tInScene / scene.duration))
-        : 1;
+      animU = easeInOutCubic(animT);
     } else if (scene.key === "pair") {
-      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
+      animU = easeInOutCubic(animT);
     } else if (scene.key === "dualZoomOut") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     } else if (scene.key === "macro") {
-      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
+      animU = easeInOutCubic(animT);
     } else if (scene.key === "macroRaster") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     } else if (scene.key === "finale") {

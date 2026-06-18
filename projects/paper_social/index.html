@@ -63,8 +63,16 @@ const RECORD_FPS = 30;
 const RASTER_SLIDE_S = 2;
 const FINALE_RASTER_HOLD_S = 2;
 const SHOW_SCENE_CAPTIONS = true;
-const CAPTION_DURATION_S = 4;
 const CAPTION_FADE_S = 0.9;
+// Scene-local seconds: full-opacity hold window (fade in/out is extra).
+const CAPTION_SCHEDULE = {
+  micro:       { start: 0,   end: 4   },
+  transition:  { start: 2.8, end: 6.8 },
+  pair:        { start: 2.5, end: 6.5 },
+  dualZoomOut: { start: 1,   end: 5   },
+  macro:       { start: 1,   end: 5   },
+  macroRaster: { start: 2,   end: 7   },
+};
 const CAPTION_FONT = '"Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif';
 const CAPTION_COLOR_TITLE = "rgba(255,255,255,0.96)";
 const CAPTION_COLOR_SUB = "rgba(255,255,255,0.74)";
@@ -701,25 +709,38 @@ function updateDebugPanel(st) {
 }
 
 function sceneCaptionWindow(st) {
-  const sceneDur = st.scene.duration;
-  const duration = Math.min(CAPTION_DURATION_S, sceneDur);
-  let start = Math.max(0, (sceneDur - duration) * 0.5);
-  if (st.scene.key === "transition") start += 1.0;
-  start = Math.min(start, Math.max(0, sceneDur - 0.5));
-  const end = Math.min(sceneDur, start + duration);
-  return { start, end };
+  const sched = CAPTION_SCHEDULE[st.scene.key];
+  if (!sched) return null;
+  return { start: sched.start, end: Math.min(sched.end, st.scene.duration) };
 }
 
 function sceneCaptionAlpha(st) {
-  const { start, end } = sceneCaptionWindow(st);
+  const win = sceneCaptionWindow(st);
+  if (!win) return 0;
+  const { start, end } = win;
   const t = st.tInScene;
-  if (t < start || t > end) return 0;
+  const sceneDur = st.scene.duration;
+  const fadeS = CAPTION_FADE_S;
 
-  const span = end - start;
-  const fadeS = Math.min(CAPTION_FADE_S, span * 0.25);
-  const inA = smoothstep(Math.min(1, (t - start) / fadeS));
-  const outA = smoothstep(Math.min(1, (end - t) / fadeS));
-  let alpha = Math.min(inA, outA);
+  const fadeInStart = Math.max(0, start - fadeS);
+  const fadeInEnd = start > 0 ? start : fadeS;
+  let fadeOutStart = end;
+  let fadeOutEnd = end + fadeS;
+  if (sceneDur - end < fadeS) {
+    fadeOutEnd = sceneDur;
+    fadeOutStart = Math.max(fadeInEnd, sceneDur - fadeS);
+  }
+
+  if (t < fadeInStart || t > fadeOutEnd) return 0;
+
+  let alpha = 1;
+  if (t < fadeInEnd) {
+    alpha = smoothstep((t - fadeInStart) / Math.max(0.001, fadeInEnd - fadeInStart));
+  } else if (t > fadeOutStart) {
+    const fadeSpan = Math.max(0.001, fadeOutEnd - fadeOutStart);
+    alpha = smoothstep((fadeOutEnd - t) / fadeSpan);
+  }
+
   if (st.scene.key === "finale") {
     alpha *= 1 - finaleFadeOut(st.u);
   }
@@ -820,7 +841,7 @@ function drawSceneCaption(ctx, w, h, L, st) {
   if (alpha <= 0.01) return;
 
   const titleSize = Math.max(36, w * 0.036);
-  const subSize = Math.max(26, w * 0.024);
+  const subSize = Math.max(34, w * 0.032);
   const gap = Math.max(6, h * 0.008);
   const place = captionPlacement(w, h, L, st);
   const { titleLines, subLines, blockH } = measureCaptionBlock(
