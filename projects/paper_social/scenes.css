@@ -1,0 +1,110 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --surface-base: #090909;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-base);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  overflow: auto;
+}
+
+#debug-panel {
+  flex: 0 0 auto;
+  width: min(920px, 96vw);
+  font-family: monospace;
+  color: #ccc;
+  line-height: 1.45;
+  user-select: none;
+  text-align: center;
+}
+
+#debug-panel.hidden {
+  display: none;
+}
+
+#debug-scene-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #fcffa4;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+#debug-scene-desc {
+  font-size: 1.05rem;
+  color: #aaa;
+  margin-bottom: 14px;
+}
+
+#debug-scene-time {
+  font-size: 1.2rem;
+  color: #ddd;
+  margin-bottom: 8px;
+}
+
+#debug-scene-next {
+  font-size: 1rem;
+  color: #777;
+  margin-bottom: 16px;
+}
+
+#debug-scene-bar {
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+#debug-scene-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #fcffa4;
+  border-radius: 4px;
+  transition: width 0.05s linear;
+}
+
+#stage {
+  flex: 0 0 auto;
+}
+
+#canvas {
+  display: block;
+  background: var(--surface-base);
+  flex-shrink: 0;
+}
+
+#reset-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  padding: 8px 16px;
+  font-family: monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: #fcffa4;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#reset-btn:hover {
+  border-color: rgba(252, 255, 164, 0.45);
+  background: #222;
+}

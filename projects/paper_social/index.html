@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Micro reservoir</title>
+<link rel="stylesheet" href="scenes.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas"></canvas>
+</div>
+<div id="debug-panel">
+  <div id="debug-scene-title">—</div>
+  <div id="debug-scene-desc">—</div>
+  <div id="debug-scene-time">—</div>
+  <div id="debug-scene-next">—</div>
+  <div id="debug-scene-bar"><div id="debug-scene-bar-fill"></div></div>
+</div>
+<button id="reset-btn" type="button">Reset</button>
+<script src="../live_viewer/math.js"></script>
+<script src="sim-core.js"></script>
+<script src="scenes.js"></script>
+<script>
+const { MicroReservoir, fitCanvas, PALETTE } = PaperSocial;
+const { sceneAt, SCENES } = SceneLexicon;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const res = new MicroReservoir({ sigma: 1.0, histMax: 512 });
+
+const SHOW_DEBUG = new URLSearchParams(location.search).get("debug") !== "0";
+
+const debugPanel = document.getElementById("debug-panel");
+const debugTitle = document.getElementById("debug-scene-title");
+const debugDesc = document.getElementById("debug-scene-desc");
+const debugTime = document.getElementById("debug-scene-time");
+const debugNext = document.getElementById("debug-scene-next");
+const debugBarFill = document.getElementById("debug-scene-bar-fill");
+
+if (!SHOW_DEBUG) debugPanel.classList.add("hidden");
+
+let tStart = performance.now();
+
+function resetAnimation() {
+  tStart = performance.now();
+  res.seedRandom();
+}
+
+document.getElementById("reset-btn").addEventListener("click", resetAnimation);
+
+function layout(w, h) {
+  const marginX = Math.max(20, w * 0.012);
+  const marginBottom = Math.max(16, h * 0.012);
+  const gap = Math.max(12, h * 0.01);
+  const netH = h * 0.58;
+
+  return {
+    marginX,
+    marginBottom,
+    gap,
+    netH,
+    netCyStart: marginX + netH * 0.5,
+    netCyEnd: h * 0.5,
+    radiusStart: Math.min(w, netH) * 0.4,
+    radiusEnd: Math.min(w, h) * 0.38,
+    rasterY: marginX + netH + gap,
+    rasterW: w - marginX * 2,
+    rasterH: h - (marginX + netH + gap) - marginBottom,
+  };
+}
+
+function drawSceneMicro(L) {
+  res.drawNetwork(ctx, canvas._fw * 0.5, L.netCyStart, L.radiusStart, {
+    showRing: false,
+    glowLight: true,
+  });
+  res.drawRaster(ctx, L.marginX, L.rasterY, L.rasterW, L.rasterH);
+}
+
+function drawSceneTransition(L, u, w, h) {
+  const netCy = L.netCyStart + (L.netCyEnd - L.netCyStart) * u;
+  const radius = L.radiusStart + (L.radiusEnd - L.radiusStart) * u;
+  res.drawNetwork(ctx, w * 0.5, netCy, radius, { showRing: false, glowLight: true });
+
+  const rasterAlpha = 1 - u;
+  if (rasterAlpha > 0.002) {
+    const slide = u * (L.rasterH + L.marginBottom + h * 0.06);
+    ctx.save();
+    ctx.globalAlpha = rasterAlpha;
+    ctx.beginPath();
+    ctx.rect(L.marginX, L.rasterY, L.rasterW, L.rasterH + slide);
+    ctx.clip();
+    ctx.translate(0, slide);
+    res.drawRaster(ctx, L.marginX, L.rasterY, L.rasterW, L.rasterH);
+    ctx.restore();
+  }
+}
+
+function updateDebugPanel(st) {
+  if (!SHOW_DEBUG) return;
+  const { scene, tInScene, u, index } = st;
+  debugTitle.textContent = scene.title;
+  debugDesc.textContent = scene.description;
+  debugTime.textContent = `${tInScene.toFixed(1)}s / ${scene.duration.toFixed(1)}s`;
+  const next = SCENES[index + 1];
+  if (next) {
+    debugNext.textContent = `next → ${next.title}`;
+  } else if (u >= 1) {
+    debugNext.textContent = "end of timeline";
+  } else {
+    debugNext.textContent = "—";
+  }
+  debugBarFill.style.width = `${(u * 100).toFixed(1)}%`;
+}
+
+function draw() {
+  const { w, h } = fitCanvas(canvas, ctx);
+  canvas._fw = w;
+  canvas._fh = h;
+
+  const tSec = (performance.now() - tStart) * 0.001;
+  const st = sceneAt(tSec);
+  const L = layout(w, h);
+
+  ctx.fillStyle = PALETTE.bg;
+  ctx.fillRect(0, 0, w, h);
+
+  if (st.scene.key === "micro") {
+    drawSceneMicro(L);
+  } else if (st.scene.key === "transition") {
+    drawSceneTransition(L, st.animU, w, h);
+  }
+
+  ctx.strokeStyle = "rgba(252,255,164,0.45)";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+
+  updateDebugPanel(st);
+}
+
+function loop() {
+  res.step(2);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
