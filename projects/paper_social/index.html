@@ -14,8 +14,13 @@
   <div id="debug-scene-title">—</div>
   <div id="debug-scene-desc">—</div>
   <div id="debug-scene-time">—</div>
+  <div id="debug-scene-frame">—</div>
+  <div id="debug-scene-scrub">
+    <button id="frame-prev" type="button" title="Previous frame (←)">−1</button>
+    <input id="debug-scene-slider" type="range" min="0" max="0" value="0" step="1" aria-label="Timeline scrubber" />
+    <button id="frame-next" type="button" title="Next frame (→)">+1</button>
+  </div>
   <div id="debug-scene-next">—</div>
-  <div id="debug-scene-bar"><div id="debug-scene-bar-fill"></div></div>
   <div id="debug-scene-jumps"></div>
 </div>
 <div id="control-btns">
@@ -24,14 +29,33 @@
 </div>
 <script src="../live_viewer/math.js"></script>
 <script src="sim-core.js"></script>
+<script src="macro-pop.js"></script>
 <script src="scenes.js"></script>
 <script>
-const { MicroReservoir, fitCanvas, PALETTE, macroBlendAt } = PaperSocial;
-const { sceneAt, SCENES, sceneStarts } = SceneLexicon;
+const { MicroReservoir, fitCanvas, PALETTE, macroBlendAt, drawBidirectionalCoupling } = PaperSocial;
+const { MacroPopulation, MACRO_POP_SEED, MACRO_VD, MACRO_P } = PaperSocialMacro;
+const { sceneAt, SCENES, sceneStarts, easeInOutCubic, totalAnimatedDuration } = SceneLexicon;
+
+const RECORD_FPS = 30;
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const res = new MicroReservoir({ sigma: 1.0, histMax: 512 });
+const resB = new MicroReservoir({ sigma: 1.0, histMax: 512, heading: Math.PI });
+const macroPop = new MacroPopulation({ seed: MACRO_POP_SEED, vd: MACRO_VD, pMicro: MACRO_P });
+
+const COLLAPSE_FRAC = 0.22;
+const CAMERA_START = 0.10;
+const CAMERA_END = 0.54;
+const PROXY_OUT_START = 0.54;
+const HANDOFF_END = 0.72;
+const MACRO_IN_END = 0.72;
+const MACRO_ZOOM_END = 1.0;
+
+function smoothstep(x) {
+  const t = Math.min(1, Math.max(0, x));
+  return t * t * (3 - 2 * t);
+}
 
 const SHOW_DEBUG = new URLSearchParams(location.search).get("debug") !== "0";
 
@@ -39,8 +63,11 @@ const debugPanel = document.getElementById("debug-panel");
 const debugTitle = document.getElementById("debug-scene-title");
 const debugDesc = document.getElementById("debug-scene-desc");
 const debugTime = document.getElementById("debug-scene-time");
+const debugFrame = document.getElementById("debug-scene-frame");
 const debugNext = document.getElementById("debug-scene-next");
-const debugBarFill = document.getElementById("debug-scene-bar-fill");
+const debugSlider = document.getElementById("debug-scene-slider");
+const framePrevBtn = document.getElementById("frame-prev");
+const frameNextBtn = document.getElementById("frame-next");
 const debugJumps = document.getElementById("debug-scene-jumps");
 
 if (!SHOW_DEBUG) debugPanel.classList.add("hidden");
@@ -59,22 +86,84 @@ const sceneJumpBtns = SCENES.map((scene, i) => {
 let tStart = performance.now();
 let paused = false;
 let tPaused = 0;
+let scrubbing = false;
 
 const stopBtn = document.getElementById("stop-btn");
+
+function timelineFrameCount() {
+  return Math.max(1, Math.ceil(totalAnimatedDuration() * RECORD_FPS));
+}
+
+function timeFromFrame(frame) {
+  return Math.min(totalAnimatedDuration(), Math.max(0, frame / RECORD_FPS));
+}
+
+function frameFromTime(tSec) {
+  return Math.min(
+    timelineFrameCount() - 1,
+    Math.max(0, Math.round(tSec * RECORD_FPS)),
+  );
+}
+
+function pauseForScrub() {
+  if (!paused) {
+    tPaused = getTSec();
+    paused = true;
+    stopBtn.textContent = "Play";
+  }
+}
+
+function seekToFrame(frame) {
+  const clamped = Math.min(timelineFrameCount() - 1, Math.max(0, frame));
+  const t = timeFromFrame(clamped);
+  tPaused = t;
+  tStart = performance.now() - t * 1000;
+  if (SHOW_DEBUG && !scrubbing) {
+    debugSlider.value = String(clamped);
+  }
+}
+
+function stepFrame(delta) {
+  pauseForScrub();
+  seekToFrame(frameFromTime(getTSec()) + delta);
+}
+
+function initTimelineScrubber() {
+  const maxFrame = timelineFrameCount() - 1;
+  debugSlider.max = String(maxFrame);
+  debugSlider.value = "0";
+  debugSlider.addEventListener("pointerdown", () => {
+    scrubbing = true;
+    pauseForScrub();
+  });
+  debugSlider.addEventListener("pointerup", () => {
+    scrubbing = false;
+  });
+  debugSlider.addEventListener("input", () => {
+    pauseForScrub();
+    seekToFrame(parseInt(debugSlider.value, 10));
+  });
+  framePrevBtn.addEventListener("click", () => stepFrame(-1));
+  frameNextBtn.addEventListener("click", () => stepFrame(1));
+}
+
+if (SHOW_DEBUG) initTimelineScrubber();
 
 function getTSec() {
   return paused ? tPaused : (performance.now() - tStart) * 0.001;
 }
 
 function jumpToScene(index) {
+  pauseForScrub();
   const starts = sceneStarts();
-  tStart = performance.now() - starts[index] * 1000;
-  tPaused = starts[index];
+  seekToFrame(frameFromTime(starts[index]));
 }
 
 function resetAnimation() {
   jumpToScene(0);
   res.seedRandom();
+  resB.seedRandom();
+  macroPop.initSeeded();
 }
 
 function togglePause() {
@@ -91,6 +180,17 @@ function togglePause() {
 
 stopBtn.addEventListener("click", togglePause);
 document.getElementById("reset-btn").addEventListener("click", resetAnimation);
+
+document.addEventListener("keydown", (e) => {
+  if (!SHOW_DEBUG || e.target.matches("input, textarea, select")) return;
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    stepFrame(-1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    stepFrame(1);
+  }
+});
 
 function layout(w, h) {
   const marginX = Math.max(20, w * 0.012);
@@ -140,34 +240,199 @@ function drawSceneTransition(L, u, w, h) {
   }
 }
 
-/** Same single reservoir — inner network shrinks/fades; light node stays fixed size. */
-function drawSceneZoomOut(L, u, w, h) {
-  const cx = w * 0.5;
+/** Positions for side-by-side pair; u=0 matches Scene 2 end (one centered reservoir). */
+function pairGeometry(w, h, u) {
+  const L = layout(w, h);
   const cy = L.netCyEnd;
+  const rEnd = L.radiusEnd;
+  const rPair = Math.min(rEnd * 0.68, w * 0.165);
+  const halfSep = rPair * 1.42;
+  const cxMid = w * 0.5;
+  const cxA_final = cxMid - halfSep;
+  const cxB_final = cxMid + halfSep;
+
+  const spread = easeInOutCubic(Math.min(1, Math.max(0, (u - 0.08) / 0.52)));
+  const spreadB = easeInOutCubic(Math.min(1, Math.max(0, (u - 0.18) / 0.52)));
+  const cxA = cxMid + (cxA_final - cxMid) * spread;
+  const cxB = cxB_final + (w + rPair * 1.5 - cxB_final) * (1 - spreadB);
+  const radius = rEnd + (rPair - rEnd) * spread;
+  const headingA = -Math.PI / 2 + spread * (Math.PI / 2);
+  const headingB = Math.PI;
+  const linkAlpha = easeInOutCubic(Math.min(1, Math.max(0, (u - 0.42) / 0.58)));
+
+  return {
+    cy, cxA, cxB, radius, rPair, rEnd, bAlpha: spreadB, linkAlpha, headingA, headingB, L,
+  };
+}
+
+function drawPairCoupling(G, linkAlpha, macroBlend, opts) {
+  if (linkAlpha <= 0.002) return;
+  const cyA = G.cyA ?? G.cy;
+  const cyB = G.cyB ?? G.cy;
+  drawBidirectionalCoupling(ctx, G.cxA, cyA, G.cxB, cyB, {
+    alpha: linkAlpha,
+    macroBlend,
+    centerToCenter: opts?.centerToCenter ?? false,
+    radius: G.radius ?? G.rPair,
+    radiusBase: G.rPair,
+    nNeurons: res.n,
+    nSensors: res.nSensors,
+    headingA: G.headingA,
+    headingB: G.headingB,
+    aLightOn: res.lightOn(),
+    bLightOn: resB.lightOn(),
+  });
+}
+
+function drawScenePair(L, u, w, h) {
+  const G = pairGeometry(w, h, u);
+
+  if (G.bAlpha > 0.45) {
+    drawPairCoupling(G, G.linkAlpha * G.bAlpha, 0);
+  }
+
+  res.drawNetwork(ctx, G.cxA, G.cy, G.radius, {
+    showRing: false,
+    glowLight: true,
+    heading: G.headingA,
+  });
+
+  if (G.bAlpha > 0.002) {
+    ctx.save();
+    ctx.globalAlpha = G.bAlpha;
+    resB.drawNetwork(ctx, G.cxB, G.cy, G.radius, {
+      showRing: false,
+      glowLight: true,
+      heading: G.headingB,
+    });
+    ctx.restore();
+  }
+}
+
+function drawAgentCollapse(reservoir, cx, cy, radiusBase, u, heading, macroBlend) {
   const detail = u <= 0 ? 1 : 1 - u;
-  const radius = u <= 0 ? L.radiusEnd : Math.max(4, L.radiusEnd * (1 - u * 0.94));
-  const fixedLightR = Math.max(2.2, L.radiusEnd * 0.09);
-  const macroBlend = macroBlendAt(u);
+  const radius = u <= 0 ? radiusBase : Math.max(4, radiusBase * (1 - u * 0.94));
+  const fixedLightR = Math.max(2.2, radiusBase * 0.09);
 
   if (detail > 0.02) {
-    res.drawNetwork(ctx, cx, cy, radius, {
+    reservoir.drawNetwork(ctx, cx, cy, radius, {
       showRing: false,
       glowLight: false,
       detail,
       fixedLightR,
       macroBlend,
+      heading,
     });
   } else {
-    res.drawLight(ctx, cx, cy, fixedLightR, { macroBlend });
+    reservoir.drawLight(ctx, cx, cy, fixedLightR, { macroBlend });
+  }
+}
+
+function drawProxyDot(reservoir, x, y, r, alpha, macroBlend) {
+  if (alpha <= 0.002) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  reservoir.drawLight(ctx, x, y, r, { macroBlend: macroBlend ?? 1 });
+  ctx.restore();
+}
+
+function scene4Phases(u) {
+  const collapseU = smoothstep(Math.min(1, Math.max(0, u / COLLAPSE_FRAC)));
+  const cameraU = smoothstep(Math.min(1, Math.max(0, (u - CAMERA_START) / (CAMERA_END - CAMERA_START))));
+  const handoffU = u <= PROXY_OUT_START
+    ? 0
+    : smoothstep(Math.min(1, Math.max(0, (u - PROXY_OUT_START) / (HANDOFF_END - PROXY_OUT_START))));
+  const proxyAlpha = Math.max(0, 1 - handoffU);
+  const macroInU = handoffU;
+  return { collapseU, cameraU, handoffU, macroInU, proxyAlpha };
+}
+
+function getMacroGraphU(tSec) {
+  const st = sceneAt(tSec);
+  if (st.scene.key !== "dualZoomOut") return 0;
+  const { cameraU, macroInU } = scene4Phases(st.u);
+  return macroInU > 0 ? macroInU : (cameraU >= 0.92 ? 0.12 : 0);
+}
+
+function drawSceneDualZoomOut(L, u, w, h) {
+  const G = pairGeometry(w, h, 1);
+  macroPop.ensureCenterAnchors(w, h, MACRO_ZOOM_END);
+  const { collapseU, cameraU, macroInU, proxyAlpha } = scene4Phases(u);
+  const macroBlend = macroBlendAt(Math.max(collapseU, cameraU));
+  const linkBlend = Math.max(macroBlend, cameraU);
+  const useCenterLink = collapseU > 0.72 || cameraU > 0.02;
+  const fixedLightR = Math.max(2.2, G.rPair * 0.09);
+
+  const fullOrig = macroPop.fullFieldOrigin(w, h, MACRO_ZOOM_END);
+  const fullTransform = macroPop.buildTransform(w, h, { origin: fullOrig });
+  const fullR = fullTransform.r;
+
+  const endA = macroPop.agentScreen(macroPop.anchorA, fullTransform);
+  const endB = macroPop.agentScreen(macroPop.anchorB, fullTransform);
+  const posT = cameraU;
+  const dotAx = G.cxA + (endA.x - G.cxA) * posT;
+  const dotAy = G.cy + (endA.y - G.cy) * posT;
+  const dotBx = G.cxB + (endB.x - G.cxB) * posT;
+  const dotBy = G.cy + (endB.y - G.cy) * posT;
+  const dotR = fixedLightR + (fullR - fixedLightR) * posT;
+
+  const nodeIn = macroInU;
+  const edgeIn = smoothstep(Math.max(0, (macroInU - 0.18) / 0.82));
+  const edgeInSoft = edgeIn * edgeIn * (3 - 2 * edgeIn);
+  const rippleCx = (endA.x + endB.x) * 0.5;
+  const rippleCy = (endA.y + endB.y) * 0.5;
+
+  const showMacro = macroInU > 0.002;
+  const showProxy = proxyAlpha > 0.002;
+
+  if (showMacro) {
+    macroPop.draw(ctx, w, h, {
+      reveal: 1,
+      revealMul: nodeIn,
+      uniformReveal: true,
+      transform: fullTransform,
+      agentR: fullR,
+      edgeAlpha: edgeInSoft,
+      rippleCx,
+      rippleCy,
+      edgeRipple: macroInU < 0.96,
+    });
+  }
+
+  const pairLinkBase = Math.max(collapseU, cameraU);
+  const pairLinkAlpha = proxyAlpha * pairLinkBase * (1 - edgeInSoft * 0.92);
+  if (pairLinkAlpha > 0.002) {
+    drawPairCoupling({
+      ...G,
+      cxA: dotAx,
+      cxB: dotBx,
+      cyA: dotAy,
+      cyB: dotBy,
+      radius: dotR,
+    }, pairLinkAlpha, linkBlend, { centerToCenter: useCenterLink });
+  }
+
+  if (!showProxy) return;
+
+  const detail = 1 - collapseU;
+  if (detail > 0.04) {
+    drawAgentCollapse(res, dotAx, dotAy, G.rPair, collapseU, G.headingA, macroBlend);
+    drawAgentCollapse(resB, dotBx, dotBy, G.rPair, collapseU, G.headingB, macroBlend);
+  } else {
+    drawProxyDot(res, dotAx, dotAy, dotR, proxyAlpha, macroInU);
+    drawProxyDot(resB, dotBx, dotBy, dotR, proxyAlpha, macroInU);
   }
 }
 
 function updateDebugPanel(st) {
   if (!SHOW_DEBUG) return;
-  const { scene, tInScene, u, index } = st;
+  const { scene, tInScene, u, index, tGlobal } = st;
+  const frame = frameFromTime(tGlobal);
+  const frameMax = timelineFrameCount() - 1;
   debugTitle.textContent = scene.title;
   debugDesc.textContent = scene.description;
-  debugTime.textContent = `${tInScene.toFixed(1)}s / ${scene.duration.toFixed(1)}s`;
+  debugTime.textContent = `${tInScene.toFixed(2)}s / ${scene.duration.toFixed(1)}s · global ${tGlobal.toFixed(2)}s`;
+  debugFrame.textContent = `frame ${frame} / ${frameMax} @ ${RECORD_FPS}fps`;
   const next = SCENES[index + 1];
   if (next) {
     debugNext.textContent = `next → ${next.title}`;
@@ -176,7 +441,7 @@ function updateDebugPanel(st) {
   } else {
     debugNext.textContent = "—";
   }
-  debugBarFill.style.width = `${(u * 100).toFixed(1)}%`;
+  if (!scrubbing) debugSlider.value = String(frame);
   sceneJumpBtns.forEach((btn, i) => {
     btn.classList.toggle("active", i === index);
   });
@@ -198,8 +463,10 @@ function draw() {
     drawSceneMicro(L);
   } else if (st.scene.key === "transition") {
     drawSceneTransition(L, st.animU, w, h);
-  } else if (st.scene.key === "zoomOut") {
-    drawSceneZoomOut(L, st.animU, w, h);
+  } else if (st.scene.key === "pair") {
+    drawScenePair(L, st.animU, w, h);
+  } else if (st.scene.key === "dualZoomOut") {
+    drawSceneDualZoomOut(L, st.u, w, h);
   }
 
   ctx.strokeStyle = "rgba(252,255,164,0.45)";
@@ -212,6 +479,11 @@ function draw() {
 function loop() {
   if (!paused) {
     res.step(2);
+    resB.step(2);
+    if (getMacroGraphU(getTSec()) > 0) {
+      macroPop.macroStep();
+      macroPop.macroStep();
+    }
     tPaused = getTSec();
   }
   draw();

@@ -13,6 +13,8 @@
   };
 
   const MACRO_OFF = "#56176b";
+  const MACRO_EDGE = "rgba(201, 46, 209, 0.55)";
+  const MICRO_LINK = "rgba(252,255,164,0.95)";
 
   function parseColor(str) {
     if (str.startsWith("#")) {
@@ -48,7 +50,7 @@
       offInner: lerpColor(PALETTE.offInner, MACRO_OFF, t),
       offSensor: lerpColor(PALETTE.offSensor, MACRO_OFF, t),
       offLight: lerpColor(PALETTE.offInner, MACRO_OFF, t),
-      edge: lerpColor(PALETTE.edge, "rgba(255,255,255,0.06)", t),
+      edge: lerpColor(PALETTE.edge, MACRO_EDGE, t),
       ring: PALETTE.ring,
       flash: PALETTE.flash,
     };
@@ -87,6 +89,128 @@
     }
     nodes.push({ x: cx, y: cy, kind: "light" });
     return nodes;
+  }
+
+  /** Sensor node closest to a target point (for observation links). */
+  function nearestSensorToward(cx, cy, radius, nNeurons, nSensors, heading, tx, ty) {
+    const nodes = buildReservoirNodes(cx, cy, radius, nNeurons, nSensors, heading);
+    let best = null;
+    let bestD = Infinity;
+    for (const n of nodes) {
+      if (n.kind !== "sensor") continue;
+      const d = (n.x - tx) ** 2 + (n.y - ty) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = n;
+      }
+    }
+    return best;
+  }
+
+  /** Point on circle boundary facing a target. */
+  function dotSurfaceToward(cx, cy, r, tx, ty) {
+    const dx = tx - cx;
+    const dy = ty - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: cx + (dx / len) * r, y: cy + (dy / len) * r };
+  }
+
+  function lerpPt(a, b, t) {
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  }
+
+  /** Light → sensor observation link; macroBlend straightens and hides sensor marker. */
+  function drawObservationLink(ctx, x0, y0, x1, y1, opts) {
+    const alpha = opts?.alpha ?? 1;
+    if (alpha <= 0.002) return;
+    const macroBlend = opts?.macroBlend ?? 0;
+    const sourceOn = opts?.sourceOn ?? false;
+    const straight = opts?.straight ?? macroBlend > 0.85;
+    const mx = (x0 + x1) * 0.5;
+    const my = (y0 + y1) * 0.5 - Math.abs(x1 - x0) * 0.08 * (1 - macroBlend);
+    const lineA = alpha * (0.38 + macroBlend * 0.42);
+    const stroke = parseColor(lerpColor(MICRO_LINK, MACRO_EDGE, macroBlend));
+
+    ctx.save();
+
+    ctx.beginPath();
+    if (straight) {
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+    } else {
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(mx, my, x1, y1);
+    }
+    ctx.strokeStyle = `rgba(${stroke[0]},${stroke[1]},${stroke[2]},${lineA.toFixed(3)})`;
+    ctx.lineWidth = Math.max(0.5, 1 + (1 - macroBlend) * 1.2 - macroBlend * 0.4);
+    if (sourceOn && macroBlend < 0.65) {
+      ctx.shadowColor = PALETTE.on;
+      ctx.shadowBlur = 4 + macroBlend * 4;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    if (macroBlend < 0.72 && !opts?.straight) {
+      ctx.beginPath();
+      ctx.arc(x1, y1, Math.max(2, 3.5 - macroBlend * 2), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(252,255,164,${(alpha * (sourceOn ? 0.35 : 0.14)).toFixed(3)})`;
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /** Bidirectional coupling: A observes B and B observes A. Draw before agents. */
+  function drawBidirectionalCoupling(ctx, cxA, cyA, cxB, cyB, opts) {
+    const alpha = opts?.alpha ?? 1;
+    if (alpha <= 0.002) return;
+
+    const macroBlend = opts?.macroBlend ?? 0;
+    const centerToCenter = opts?.centerToCenter ?? false;
+
+    if (centerToCenter || macroBlend >= 0.98) {
+      const aOn = opts?.aLightOn ?? false;
+      const bOn = opts?.bLightOn ?? false;
+      drawObservationLink(ctx, cxA, cyA, cxB, cyB, {
+        alpha,
+        sourceOn: aOn || bOn,
+        macroBlend,
+        straight: true,
+      });
+      return;
+    }
+    const radius = opts?.radius ?? 40;
+    const nNeurons = opts?.nNeurons ?? 64;
+    const nSensors = opts?.nSensors ?? 8;
+    const headingA = opts?.headingA ?? -Math.PI / 2;
+    const headingB = opts?.headingB ?? Math.PI;
+    const lightR = Math.max(2.2, (opts?.radiusBase ?? radius) * 0.09);
+    const aOn = opts?.aLightOn ?? false;
+    const bOn = opts?.bLightOn ?? false;
+
+    const sensB = nearestSensorToward(cxB, cyB, radius, nNeurons, nSensors, headingB, cxA, cyA);
+    const sensA = nearestSensorToward(cxA, cyA, radius, nNeurons, nSensors, headingA, cxB, cyB);
+    if (!sensB || !sensA) return;
+
+    const surfA = dotSurfaceToward(cxA, cyA, lightR, cxB, cyB);
+    const surfB = dotSurfaceToward(cxB, cyB, lightR, cxA, cyA);
+    const t = macroBlend;
+
+    const aToB0 = lerpPt({ x: cxA, y: cyA }, surfA, t);
+    const aToB1 = lerpPt(sensB, surfB, t);
+    const bToA0 = lerpPt({ x: cxB, y: cyB }, surfB, t);
+    const bToA1 = lerpPt(sensA, surfA, t);
+
+    drawObservationLink(ctx, aToB0.x, aToB0.y, aToB1.x, aToB1.y, {
+      alpha,
+      sourceOn: aOn,
+      macroBlend,
+    });
+    drawObservationLink(ctx, bToA0.x, bToA0.y, bToA1.x, bToA1.y, {
+      alpha,
+      sourceOn: bOn,
+      macroBlend,
+    });
   }
 
   class MicroReservoir {
@@ -155,7 +279,8 @@
       const pal = macroBlend != null ? paletteAt(macroBlend) : PALETTE;
       const showRing = opts?.showRing !== false && detail > 0.35;
       const glowLight = opts?.glowLight !== false && !fixedLightR;
-      const nodes = buildReservoirNodes(cx, cy, radius, this.n, this.nSensors, this.heading);
+      const heading = opts?.heading ?? this.heading;
+      const nodes = buildReservoirNodes(cx, cy, radius, this.n, this.nSensors, heading);
 
       if (fixedLightR && detail <= 0.02) {
         this.drawLight(ctx, cx, cy, fixedLightR, { macroBlend });
@@ -296,6 +421,176 @@
     }
   }
 
+  /** Seeded PRNG (mulberry32) — deterministic layout across reloads. */
+  function mulberry32(seed) {
+    return function next() {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), seed | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const MACRO_GRAPH_SEED = 42;
+  const MACRO_GRAPH_EXTRA = 12;
+
+  /** Place extra macro agents; edges are directed by each agent's vision disk. */
+  function buildMacroGraphLayout(w, h, seed, anchors, opts) {
+    const rng = mulberry32(seed >>> 0);
+    const margin = Math.max(52, Math.min(w, h) * 0.07);
+    const minDist = opts?.minDist ?? 78;
+    const extraCount = opts?.extraCount ?? MACRO_GRAPH_EXTRA;
+
+    const baseVisionR = opts?.visionR ?? Math.min(w, h) * 0.21;
+
+    const nodes = anchors.map((a, i) => ({
+      x: a.x,
+      y: a.y,
+      on: !!a.on,
+      anchor: true,
+      id: i,
+      visionR: baseVisionR,
+    }));
+
+    for (let k = 0; k < extraCount; k++) {
+      let placed = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const x = margin + rng() * (w - margin * 2);
+        const y = margin + rng() * (h - margin * 2);
+        let ok = true;
+        for (const n of nodes) {
+          if (Math.hypot(n.x - x, n.y - y) < minDist) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) {
+          nodes.push({
+            x,
+            y,
+            on: rng() > 0.62,
+            anchor: false,
+            id: nodes.length,
+            visionR: baseVisionR,
+          });
+          placed = true;
+          break;
+        }
+      }
+    }
+
+    /** i → j when j's light lies inside i's vision disk. */
+    const edges = [];
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = 0; j < nodes.length; j++) {
+        if (i === j) continue;
+        const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+        if (d <= nodes[i].visionR) edges.push({ from: i, to: j });
+      }
+    }
+
+    return { nodes, edges, baseVisionR, anchorCount: anchors.length };
+  }
+
+  function graphAnchorPositions(nodes, baseVisionR, graphU) {
+    if (nodes.length < 2) return nodes;
+    const cxA0 = nodes[0].x;
+    const cxB0 = nodes[1].x;
+    const cy = nodes[0].y;
+    const cxMid = (cxA0 + cxB0) * 0.5;
+    const half = (cxB0 - cxA0) * 0.5;
+    const maxHalf = baseVisionR * 0.48;
+    if (half <= maxHalf) return nodes;
+    const compress = Math.min(1, graphU * 2.2);
+    const halfNow = half + (maxHalf - half) * compress;
+    const cxA = cxMid - halfNow;
+    const cxB = cxMid + halfNow;
+    return nodes.map((n, i) => {
+      if (i === 0) return { ...n, x: cxA, y: cy };
+      if (i === 1) return { ...n, x: cxB, y: cy };
+      return n;
+    });
+  }
+
+  function buildVisionEdges(nodes) {
+    const edges = [];
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = 0; j < nodes.length; j++) {
+        if (i === j) continue;
+        const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+        if (d <= nodes[i].visionR) edges.push({ from: i, to: j });
+      }
+    }
+    return edges;
+  }
+
+  function graphNodeReveal(index, anchorCount, graphU) {
+    if (graphU <= 0) return 0;
+    if (index < anchorCount) return 1;
+    const order = index - anchorCount;
+    const start = order * 0.065;
+    const dur = 0.2;
+    const t = (graphU - start) / dur;
+    return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+  }
+
+  /** Draw macro agent graph — vision disks, directed edges, then dots. */
+  function drawMacroGraph(ctx, graph, graphU, dotR) {
+    if (graphU <= 0) return;
+
+    const { anchorCount, baseVisionR } = graph;
+    const nodes = graphAnchorPositions(graph.nodes, baseVisionR, graphU);
+    const edges = buildVisionEdges(nodes);
+    const alphas = nodes.map((_, i) => graphNodeReveal(i, anchorCount, graphU));
+
+    for (let i = 0; i < nodes.length; i++) {
+      const alpha = alphas[i];
+      if (alpha <= 0.002) continue;
+      const n = nodes[i];
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.22;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.visionR, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(240,240,240,0.55)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const { from, to } of edges) {
+      const edgeA = Math.min(alphas[from], alphas[to]);
+      if (edgeA <= 0.002) continue;
+      const observer = nodes[from];
+      const target = nodes[to];
+      const p0 = dotSurfaceToward(observer.x, observer.y, dotR, target.x, target.y);
+      const p1 = dotSurfaceToward(target.x, target.y, dotR, observer.x, observer.y);
+      drawObservationLink(ctx, p0.x, p0.y, p1.x, p1.y, {
+        alpha: edgeA,
+        macroBlend: 1,
+        sourceOn: target.on,
+      });
+    }
+
+    for (let i = 0; i < nodes.length; i++) {
+      const alpha = alphas[i];
+      if (alpha <= 0.002) continue;
+      const n = nodes[i];
+      const pal = paletteAt(1);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = n.on ? pal.on : pal.offLight;
+      if (n.on) {
+        ctx.shadowColor = pal.on;
+        ctx.shadowBlur = dotR * 2.2;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  }
+
   /** Export pixel sizes for screen recording / ffmpeg. */
   /** Platform presets (export pixels). Default: YouTube embed + LinkedIn landscape. */
   const FRAME_PRESETS = {
@@ -348,10 +643,22 @@
   global.PaperSocial = {
     PALETTE,
     MACRO_OFF,
+    MACRO_EDGE,
+    MICRO_LINK,
     paletteAt,
     macroBlendAt,
     MicroReservoir,
     buildReservoirNodes,
+    nearestSensorToward,
+    drawObservationLink,
+    drawBidirectionalCoupling,
+    mulberry32,
+    MACRO_GRAPH_SEED,
+    MACRO_GRAPH_EXTRA,
+    buildMacroGraphLayout,
+    buildVisionEdges,
+    graphAnchorPositions,
+    drawMacroGraph,
     FRAME_PRESETS,
     fitCanvas,
     getFrameSize,

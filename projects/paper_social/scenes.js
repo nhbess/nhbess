@@ -18,11 +18,18 @@
       duration: 4.0,
     },
     {
-      key: "zoomOut",
+      key: "pair",
       id: 3,
-      title: "Scene 3 · Zoom Out",
-      description: "Zoom out — full reservoir collapses to the light readout node",
-      duration: 4.0,
+      title: "Scene 3 · Pair",
+      description: "Second reservoir joins; light → sensor observation link",
+      duration: 5.0,
+    },
+    {
+      key: "dualZoomOut",
+      id: 4,
+      title: "Scene 4 · Dual Zoom Out",
+      description: "Pair collapses; micro dots zoom out alone to macro scale, then the field fades in",
+      duration: 6.0,
     },
   ];
 
@@ -60,7 +67,9 @@
       animU = tInScene < scene.duration
         ? easeInOutCubic(Math.min(1, tInScene / scene.duration))
         : 1;
-    } else if (scene.key === "zoomOut") {
+    } else if (scene.key === "pair") {
+      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
+    } else if (scene.key === "dualZoomOut") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     }
 
