@@ -17,7 +17,13 @@
       description: "Raster slides away; network moves to center",
       duration: 4.0,
     },
-    // Scene 3+ will be appended here (e.g. zoom-out, macro, …)
+    {
+      key: "zoomOut",
+      id: 3,
+      title: "Scene 3 · Zoom Out",
+      description: "Zoom out — full reservoir collapses to the light readout node",
+      duration: 4.0,
+    },
   ];
 
   function sceneStarts() {
@@ -54,6 +60,8 @@
       animU = tInScene < scene.duration
         ? easeInOutCubic(Math.min(1, tInScene / scene.duration))
         : 1;
+    } else if (scene.key === "zoomOut") {
+      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     }
 
     return { scene, index, tInScene, u, tGlobal, animU, starts };

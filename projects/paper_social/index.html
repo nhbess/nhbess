@@ -16,14 +16,18 @@
   <div id="debug-scene-time">—</div>
   <div id="debug-scene-next">—</div>
   <div id="debug-scene-bar"><div id="debug-scene-bar-fill"></div></div>
+  <div id="debug-scene-jumps"></div>
 </div>
-<button id="reset-btn" type="button">Reset</button>
+<div id="control-btns">
+  <button id="stop-btn" type="button">Stop</button>
+  <button id="reset-btn" type="button">Reset</button>
+</div>
 <script src="../live_viewer/math.js"></script>
 <script src="sim-core.js"></script>
 <script src="scenes.js"></script>
 <script>
-const { MicroReservoir, fitCanvas, PALETTE } = PaperSocial;
-const { sceneAt, SCENES } = SceneLexicon;
+const { MicroReservoir, fitCanvas, PALETTE, macroBlendAt } = PaperSocial;
+const { sceneAt, SCENES, sceneStarts } = SceneLexicon;
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -37,16 +41,55 @@ const debugDesc = document.getElementById("debug-scene-desc");
 const debugTime = document.getElementById("debug-scene-time");
 const debugNext = document.getElementById("debug-scene-next");
 const debugBarFill = document.getElementById("debug-scene-bar-fill");
+const debugJumps = document.getElementById("debug-scene-jumps");
 
 if (!SHOW_DEBUG) debugPanel.classList.add("hidden");
 
+const sceneJumpBtns = SCENES.map((scene, i) => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "scene-jump-btn";
+  btn.textContent = `Scene ${scene.id}`;
+  btn.title = scene.title;
+  btn.addEventListener("click", () => jumpToScene(i));
+  debugJumps.appendChild(btn);
+  return btn;
+});
+
 let tStart = performance.now();
+let paused = false;
+let tPaused = 0;
+
+const stopBtn = document.getElementById("stop-btn");
+
+function getTSec() {
+  return paused ? tPaused : (performance.now() - tStart) * 0.001;
+}
+
+function jumpToScene(index) {
+  const starts = sceneStarts();
+  tStart = performance.now() - starts[index] * 1000;
+  tPaused = starts[index];
+}
 
 function resetAnimation() {
-  tStart = performance.now();
+  jumpToScene(0);
   res.seedRandom();
 }
 
+function togglePause() {
+  if (paused) {
+    tStart = performance.now() - tPaused * 1000;
+    paused = false;
+    stopBtn.textContent = "Stop";
+  } else {
+    tPaused = getTSec();
+    paused = true;
+    stopBtn.textContent = "Play";
+  }
+}
+
+stopBtn.addEventListener("click", togglePause);
 document.getElementById("reset-btn").addEventListener("click", resetAnimation);
 
 function layout(w, h) {
@@ -97,6 +140,28 @@ function drawSceneTransition(L, u, w, h) {
   }
 }
 
+/** Same single reservoir — inner network shrinks/fades; light node stays fixed size. */
+function drawSceneZoomOut(L, u, w, h) {
+  const cx = w * 0.5;
+  const cy = L.netCyEnd;
+  const detail = u <= 0 ? 1 : 1 - u;
+  const radius = u <= 0 ? L.radiusEnd : Math.max(4, L.radiusEnd * (1 - u * 0.94));
+  const fixedLightR = Math.max(2.2, L.radiusEnd * 0.09);
+  const macroBlend = macroBlendAt(u);
+
+  if (detail > 0.02) {
+    res.drawNetwork(ctx, cx, cy, radius, {
+      showRing: false,
+      glowLight: false,
+      detail,
+      fixedLightR,
+      macroBlend,
+    });
+  } else {
+    res.drawLight(ctx, cx, cy, fixedLightR, { macroBlend });
+  }
+}
+
 function updateDebugPanel(st) {
   if (!SHOW_DEBUG) return;
   const { scene, tInScene, u, index } = st;
@@ -112,6 +177,9 @@ function updateDebugPanel(st) {
     debugNext.textContent = "—";
   }
   debugBarFill.style.width = `${(u * 100).toFixed(1)}%`;
+  sceneJumpBtns.forEach((btn, i) => {
+    btn.classList.toggle("active", i === index);
+  });
 }
 
 function draw() {
@@ -119,7 +187,7 @@ function draw() {
   canvas._fw = w;
   canvas._fh = h;
 
-  const tSec = (performance.now() - tStart) * 0.001;
+  const tSec = getTSec();
   const st = sceneAt(tSec);
   const L = layout(w, h);
 
@@ -130,6 +198,8 @@ function draw() {
     drawSceneMicro(L);
   } else if (st.scene.key === "transition") {
     drawSceneTransition(L, st.animU, w, h);
+  } else if (st.scene.key === "zoomOut") {
+    drawSceneZoomOut(L, st.animU, w, h);
   }
 
   ctx.strokeStyle = "rgba(252,255,164,0.45)";
@@ -140,7 +210,10 @@ function draw() {
 }
 
 function loop() {
-  res.step(2);
+  if (!paused) {
+    res.step(2);
+    tPaused = getTSec();
+  }
   draw();
   requestAnimationFrame(loop);
 }

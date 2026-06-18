@@ -78,6 +78,37 @@ body {
   transition: width 0.05s linear;
 }
 
+#debug-scene-jumps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.scene-jump-btn {
+  padding: 10px 18px;
+  font-family: monospace;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: #ccc;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.scene-jump-btn:hover {
+  border-color: rgba(252, 255, 164, 0.45);
+  color: #fcffa4;
+}
+
+.scene-jump-btn.active {
+  color: #090909;
+  background: #fcffa4;
+  border-color: #fcffa4;
+}
+
 #stage {
   flex: 0 0 auto;
 }
@@ -88,11 +119,17 @@ body {
   flex-shrink: 0;
 }
 
-#reset-btn {
+#control-btns {
   position: fixed;
   right: 16px;
   bottom: 16px;
   z-index: 20;
+  display: flex;
+  gap: 8px;
+}
+
+#stop-btn,
+#reset-btn {
   padding: 8px 16px;
   font-family: monospace;
   font-size: 0.78rem;
@@ -104,6 +141,7 @@ body {
   cursor: pointer;
 }
 
+#stop-btn:hover,
 #reset-btn:hover {
   border-color: rgba(252, 255, 164, 0.45);
   background: #222;

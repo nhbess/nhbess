@@ -12,6 +12,53 @@
     flash: "rgba(231,116,36,1)",
   };
 
+  const MACRO_OFF = "#56176b";
+
+  function parseColor(str) {
+    if (str.startsWith("#")) {
+      const hex = str.slice(1);
+      const full = hex.length === 3
+        ? hex.replace(/./g, (c) => c + c)
+        : hex;
+      const n = parseInt(full, 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
+    }
+    const m = str.match(/rgba?\(([^)]+)\)/);
+    if (!m) return [58, 58, 58, 1];
+    const p = m[1].split(",").map((s) => parseFloat(s.trim()));
+    return [p[0], p[1], p[2], p[3] ?? 1];
+  }
+
+  function lerpColor(a, b, t) {
+    const ca = parseColor(a);
+    const cb = parseColor(b);
+    const r = ca[0] + (cb[0] - ca[0]) * t;
+    const g = ca[1] + (cb[1] - ca[1]) * t;
+    const bl = ca[2] + (cb[2] - ca[2]) * t;
+    const al = ca[3] + (cb[3] - ca[3]) * t;
+    return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(bl)},${al.toFixed(3)})`;
+  }
+
+  /** 0 = micro palette, 1 = macro (firefly) palette. */
+  function paletteAt(macroBlend) {
+    const t = Math.max(0, Math.min(1, macroBlend));
+    return {
+      bg: PALETTE.bg,
+      on: PALETTE.on,
+      offInner: lerpColor(PALETTE.offInner, MACRO_OFF, t),
+      offSensor: lerpColor(PALETTE.offSensor, MACRO_OFF, t),
+      offLight: lerpColor(PALETTE.offInner, MACRO_OFF, t),
+      edge: lerpColor(PALETTE.edge, "rgba(255,255,255,0.06)", t),
+      ring: PALETTE.ring,
+      flash: PALETTE.flash,
+    };
+  }
+
+  function macroBlendAt(u) {
+    const t = Math.max(0, Math.min(1, u));
+    return t * t * (3 - 2 * t);
+  }
+
   function buildReservoirNodes(cx, cy, radius, nNeurons, nSensors, heading) {
     const nodes = [];
     const dTheta = (Math.PI * 2) / nSensors;
@@ -85,20 +132,48 @@
       return this.state[this.n - 1] === 1;
     }
 
+    drawLight(ctx, x, y, rPx, opts) {
+      const pal = opts?.macroBlend != null
+        ? paletteAt(opts.macroBlend)
+        : { ...PALETTE, offLight: MACRO_OFF };
+      const on = this.lightOn();
+      ctx.beginPath();
+      ctx.arc(x, y, rPx, 0, Math.PI * 2);
+      ctx.fillStyle = on ? pal.on : pal.offLight;
+      if (on) {
+        ctx.shadowColor = pal.on;
+        ctx.shadowBlur = rPx * 2.2;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
     drawNetwork(ctx, cx, cy, radius, opts) {
-      const showRing = opts?.showRing !== false;
-      const glowLight = opts?.glowLight !== false;
+      const detail = opts?.detail ?? 1;
+      const fixedLightR = opts?.fixedLightR;
+      const macroBlend = opts?.macroBlend;
+      const pal = macroBlend != null ? paletteAt(macroBlend) : PALETTE;
+      const showRing = opts?.showRing !== false && detail > 0.35;
+      const glowLight = opts?.glowLight !== false && !fixedLightR;
       const nodes = buildReservoirNodes(cx, cy, radius, this.n, this.nSensors, this.heading);
+
+      if (fixedLightR && detail <= 0.02) {
+        this.drawLight(ctx, cx, cy, fixedLightR, { macroBlend });
+        return;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, detail));
 
       if (showRing) {
         ctx.beginPath();
         ctx.arc(cx, cy, radius * 0.92, 0, Math.PI * 2);
-        ctx.strokeStyle = PALETTE.ring;
+        ctx.strokeStyle = pal.ring;
         ctx.lineWidth = Math.max(1, radius * 0.025);
         ctx.stroke();
       }
 
-      ctx.strokeStyle = PALETTE.edge;
+      ctx.strokeStyle = pal.edge;
       ctx.lineWidth = Math.max(0.4, radius * 0.012);
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
@@ -115,6 +190,8 @@
 
       for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
+        if (fixedLightR && n.kind === "light") continue;
+
         const idx = n.kind === "sensor"
           ? i
           : n.kind === "light"
@@ -129,12 +206,12 @@
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         if (on) {
           if (n.kind === "light" && glowLight) {
-            ctx.shadowColor = PALETTE.on;
+            ctx.shadowColor = pal.on;
             ctx.shadowBlur = radius * 0.35;
           }
-          ctx.fillStyle = n.kind === "light" ? PALETTE.on : "rgba(240,240,240,0.95)";
+          ctx.fillStyle = n.kind === "light" ? pal.on : "rgba(240,240,240,0.95)";
         } else {
-          ctx.fillStyle = n.kind === "sensor" ? PALETTE.offSensor : PALETTE.offInner;
+          ctx.fillStyle = n.kind === "sensor" ? pal.offSensor : pal.offInner;
         }
         ctx.fill();
         ctx.shadowBlur = 0;
@@ -148,6 +225,12 @@
         ctx.arc(cx, cy, radius * 0.98, 0, Math.PI * 2);
         ctx.stroke();
         this.reseedFlash--;
+      }
+
+      ctx.restore();
+
+      if (fixedLightR) {
+        this.drawLight(ctx, cx, cy, fixedLightR, { macroBlend });
       }
     }
 
@@ -185,10 +268,13 @@
     drawMacroDot(ctx, x, y, r, opts) {
       const on = opts?.forceOn ?? this.lightOn();
       const hintMicro = opts?.hintMicro ?? false;
+      const pal = opts?.macroBlend != null
+        ? paletteAt(opts.macroBlend)
+        : { ...PALETTE, offLight: MACRO_OFF };
 
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = on ? PALETTE.on : "#56176b";
+      ctx.fillStyle = on ? pal.on : pal.offLight;
       if (on) {
         ctx.shadowColor = PALETTE.on;
         ctx.shadowBlur = r * 2.2;
@@ -261,6 +347,9 @@
 
   global.PaperSocial = {
     PALETTE,
+    MACRO_OFF,
+    paletteAt,
+    macroBlendAt,
     MicroReservoir,
     buildReservoirNodes,
     FRAME_PRESETS,
