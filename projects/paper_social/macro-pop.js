@@ -45,6 +45,9 @@
       this._anchorW = 0;
       this._anchorH = 0;
       this._anchorZoom = 0;
+      this.histMax = opts?.histMax ?? 1024;
+      this.popHistory = [];
+      this._recordHistory = false;
       this.initSeeded();
     }
 
@@ -118,9 +121,14 @@
       this._anchorW = 0;
       this._anchorH = 0;
       this._anchorZoom = 0;
+      this.popHistory = [];
       this.buildPowers();
       this.rebuildAdj();
       this.computeObs();
+    }
+
+    clearPopHistory() {
+      this.popHistory = [];
     }
 
     buildPowers() {
@@ -259,6 +267,41 @@
       } else {
         this.darkSteps = 0;
       }
+
+      if (this._recordHistory) {
+        this.popHistory.push(new Uint8Array(this.lights));
+        if (this.popHistory.length > this.histMax) this.popHistory.shift();
+      }
+    }
+
+    /**
+     * Population raster: one row per agent (256), one column per recorded timestep.
+     * Always fills the entire [x, y, maxW, maxH] rectangle.
+     */
+    drawPopRaster(ctx, x, y, maxW, maxH, opts) {
+      const alpha = opts?.alpha ?? 1;
+      const histLen = this.popHistory.length;
+      if (alpha <= 0.002 || histLen === 0) return;
+
+      const rows = N_AGENTS;
+      const rowH = maxH / rows;
+      const colW = maxW / histLen;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = PAL.bg;
+      ctx.fillRect(x, y, maxW, maxH);
+
+      ctx.fillStyle = PAL.on;
+      for (let xi = 0; xi < histLen; xi++) {
+        const col = this.popHistory[xi];
+        const px = x + xi * colW;
+        for (let a = 0; a < rows; a++) {
+          if (!col[a]) continue;
+          ctx.fillRect(px, y + a * rowH, colW, rowH);
+        }
+      }
+      ctx.restore();
     }
 
     scaleBaseFor(w, h) {
@@ -299,6 +342,20 @@
         scaleBase,
         vdPx: this.vd * scale,
         clip,
+      };
+    }
+
+    /** Fit the toroidal field into a horizontal band (Scene 6 end layout). */
+    bandFieldOrigin(w, bandTop, bandH) {
+      const pad = 0.02;
+      const drawW = w * (1 - pad * 2);
+      const drawH = bandH * (1 - pad);
+      const scale = Math.max(drawW / MAP_W, drawH / MAP_H);
+      const cy = bandTop + bandH * 0.5;
+      return {
+        ox: (w - MAP_W * scale) * 0.5,
+        oy: cy - (MAP_H * scale) * 0.5,
+        scale,
       };
     }
 

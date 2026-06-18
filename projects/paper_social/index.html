@@ -157,6 +157,7 @@ const sceneJumpBtns = SCENES.map((scene, i) => {
 
 let tStart = performance.now();
 let paused = false;
+let prevSceneKey = null;
 let tPaused = 0;
 let scrubbing = false;
 
@@ -518,6 +519,58 @@ function drawSceneMacro(_L, _u, w, h) {
   drawFullMacroField(w, h);
 }
 
+function drawSceneMacroRaster(L, u, w, h) {
+  const t = easeInOutCubic(u);
+  const fullOrig = macroPop.fullFieldOrigin(w, h, MACRO_ZOOM_END);
+  const bandTop = L.marginX;
+  const bandH = L.netH;
+  const bandOrig = macroPop.bandFieldOrigin(w, bandTop, bandH);
+  const bandClip = { x: L.marginX, y: bandTop, w: L.rasterW, h: bandH };
+  const origin = macroPop.lerpOrigin(fullOrig, bandOrig, t);
+
+  const padFrac = 0.035;
+  const fullClip = { x: w * padFrac, y: h * padFrac, w: w * (1 - padFrac * 2), h: h * (1 - padFrac * 2) };
+  const clip = {
+    x: fullClip.x + (bandClip.x - fullClip.x) * t,
+    y: fullClip.y + (bandClip.y - fullClip.y) * t,
+    w: fullClip.w + (bandClip.w - fullClip.w) * t,
+    h: fullClip.h + (bandClip.h - fullClip.h) * t,
+  };
+
+  const fullTransform = macroPop.buildTransform(w, h, { origin: fullOrig });
+  const endTransform = macroPop.buildTransform(w, h, { origin: bandOrig, clip: bandClip });
+  const transform = macroPop.buildTransform(w, h, { origin, clip });
+  const agentR = fullTransform.r + (endTransform.r - fullTransform.r) * t;
+
+  macroPop.draw(ctx, w, h, {
+    reveal: 1,
+    revealMul: 1,
+    uniformReveal: true,
+    transform,
+    agentR,
+    edgeAlpha: 1,
+    edgeRipple: false,
+  });
+
+  const rasterIn = smoothstep(Math.max(0, (t - 0.18) / 0.82));
+  if (rasterIn <= 0.002) return;
+
+  const slide = (1 - rasterIn) * (L.rasterH + L.marginBottom + h * 0.06);
+  ctx.save();
+  ctx.globalAlpha = rasterIn;
+  ctx.beginPath();
+  ctx.rect(L.marginX, L.rasterY, L.rasterW, L.rasterH + slide);
+  ctx.clip();
+  ctx.translate(0, slide);
+  macroPop.drawPopRaster(ctx, L.marginX, L.rasterY, L.rasterW, L.rasterH);
+  ctx.restore();
+}
+
+function macroHistoryActive(tSec) {
+  const key = sceneAt(tSec).scene.key;
+  return key === "macro" || key === "macroRaster";
+}
+
 function updateDebugPanel(st) {
   if (!SHOW_DEBUG) return;
   const { scene, tInScene, u, index, tGlobal } = st;
@@ -568,6 +621,8 @@ function draw() {
     drawSceneDualZoomOut(L, st.u, w, h);
   } else if (st.scene.key === "macro") {
     drawSceneMacro(L, st.u, w, h);
+  } else if (st.scene.key === "macroRaster") {
+    drawSceneMacroRaster(L, st.animU, w, h);
   }
 
   ctx.strokeStyle = "rgba(252,255,164,0.45)";
@@ -581,10 +636,20 @@ function loop() {
   const tSec = getTSec();
   const st = sceneAt(tSec);
 
+  if (st.scene.key === "macro" && prevSceneKey !== "macro" && prevSceneKey !== "macroRaster") {
+    macroPop.clearPopHistory();
+  }
+  if (st.scene.key === "macroRaster" && prevSceneKey !== "macroRaster" && macroPop.popHistory.length < 32) {
+    macroPop._recordHistory = true;
+    for (let i = 0; i < 100; i++) macroPop.macroStep();
+  }
+  macroPop._recordHistory = macroHistoryActive(tSec);
+  prevSceneKey = st.scene.key;
+
   if (!paused) {
     res.step(2);
     resB.step(2);
-    if (st.scene.key === "macro") {
+    if (st.scene.key === "macro" || st.scene.key === "macroRaster") {
       for (let i = 0; i < 4; i++) macroPop.macroStep();
     } else if (getMacroGraphU(tSec) > 0) {
       macroPop.macroStep();

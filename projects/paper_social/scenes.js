@@ -38,6 +38,13 @@
       description: "Full macro field continues — critical cascades",
       duration: 5.0,
     },
+    {
+      key: "macroRaster",
+      id: 6,
+      title: "Scene 6 · Macro Raster",
+      description: "Field moves to top band (like Scene 1); population raster fills the bottom band",
+      duration: 4.0,
+    },
   ];
 
   function sceneStarts() {
@@ -79,6 +86,8 @@
     } else if (scene.key === "dualZoomOut") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     } else if (scene.key === "macro") {
+      animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
+    } else if (scene.key === "macroRaster") {
       animU = easeInOutCubic(Math.min(1, tInScene / scene.duration));
     }
 
